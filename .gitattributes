@@ -1,0 +1,18 @@
+# Normalize text files to LF in the repository and in checkouts.
+# Windows contributors keep CRLF in their working tree only where their editor
+# chooses to; the committed bytes stay stable, so diffs never churn on line
+# endings alone.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Keep the generated lockfile diffable
+pnpm-lock.yaml text eol=lf

@@ -1,0 +1,20 @@
+# dsh-plugin-status-board — bundle patch
+#
+# This file is the `dsh.bundle.patch` layer of the package. Installing the
+# bundle (Plugin Manager → Install bundle, or `dsh plugin add`) makes the
+# profile select it; the Loader then merges this patch and mounts one row.
+#
+#   - insert:
+#       - id: status-board
+#         name: 'dsh-plugin-status-board'
+#
+# The row id is the Loader entry id. It is also the key the plugin's settings
+# form is addressed by, so keep it stable across upgrades.
+- insert:
+    - id: status-board
+      name: 'dsh-plugin-status-board'
+      config:
+        recentWindowHours: 24
+        maxRecent: 20
+        defaultCollapsed: recent
+        showEmptyBuckets: true

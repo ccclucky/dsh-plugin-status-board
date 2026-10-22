@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "title": "Session Status Board",
+    "description": "Groups sessions into three collapsible boards — Needs my decision, Running, and Recent records — so every session's real state fits on one screen."
+  },
+  "panel": {
+    "title": "Session Status Board",
+    "subtitle": "Sessions grouped by state"
+  },
+  "bucket": {
+    "decision": "Needs my decision",
+    "executing": "Running",
+    "recent": "Recent records",
+    "decisionHint": "These sessions wait for your call before they can continue",
+    "executingHint": "The agent is working",
+    "recentHint": "Active in the last {hours} hours",
+    "empty": "No sessions",
+    "expand": "Expand “{name}” ({count} sessions)",
+    "collapse": "Collapse “{name}” ({count} sessions)"
+  },
+  "state": {
+    "loading": "Reading sessions…",
+    "empty": "No sessions to show yet",
+    "error": "Could not read sessions; the board may be incomplete",
+    "retry": "Retry"
+  },
+  "summary": {
+    "total": "{total} sessions",
+    "truncated": "{count} older sessions are hidden"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} h ago",
+    "daysAgo": "{count} d ago",
+    "unknown": "time unknown"
+  },
+  "action": {
+    "open": "Open session",
+    "refresh": "Refresh board"
+  },
+  "a11y": {
+    "panel": "Session status board panel",
+    "running": "Running",
+    "decision": "Needs decision",
+    "idle": "Idle",
+    "unknown": "State unknown"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "title": "会话状态看板",
+    "description": "把会话按「待我决策 / 正在执行 / 近期记录」归入三块可折叠看板，一屏掌握所有会话的真实状态。"
+  },
+  "panel": {
+    "title": "会话状态看板",
+    "subtitle": "按状态聚合的会话视图"
+  },
+  "bucket": {
+    "decision": "待我决策",
+    "executing": "正在执行",
+    "recent": "近期记录",
+    "decisionHint": "这些会话在等你拍板，才能继续",
+    "executingHint": "Agent 正在处理",
+    "recentHint": "最近 {hours} 小时内有动静",
+    "empty": "暂无会话",
+    "expand": "展开「{name}」（{count} 个会话）",
+    "collapse": "收起「{name}」（{count} 个会话）"
+  },
+  "state": {
+    "loading": "正在读取会话…",
+    "empty": "还没有可展示的会话",
+    "error": "读取会话失败，看板可能不完整",
+    "retry": "重试"
+  },
+  "summary": {
+    "total": "共 {total} 个会话",
+    "truncated": "另有 {count} 个较早会话未显示"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{count} 分钟前",
+    "hoursAgo": "{count} 小时前",
+    "daysAgo": "{count} 天前",
+    "unknown": "时间未知"
+  },
+  "action": {
+    "open": "打开会话",
+    "refresh": "刷新看板"
+  },
+  "a11y": {
+    "panel": "会话状态看板面板",
+    "running": "执行中",
+    "decision": "待决策",
+    "idle": "空闲",
+    "unknown": "状态未知"
+  }
+}
