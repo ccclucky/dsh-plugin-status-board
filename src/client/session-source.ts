@@ -6,32 +6,53 @@
  * the classifier, the view and every test keep working against the reduced
  * shape.
  *
- * The published shape is mirrored structurally (no Harness import) for the same
- * reason the Host half mirrors its services: a bundle must build in this
- * repository and resolve the deployment's packages at load time. Optional
- * fields are read through explicit `unknown`-safe checks, so a stricter or
- * leaner snapshot degrades instead of throwing.
+ * Every field read below was checked against the installed Harness
+ * (`@deepseek-ai/dsh-api-session-controller`): `SessionListState` publishes
+ * `{ ids, byId, phase, projectionsBySession }`, and each `SessionSummary`
+ * carries `id / displayTitle / title? / cwd? / parentId? / origin? / running /
+ * blank / updatedAt`. There is no scalar "awaiting decision" field, so that
+ * state is derived from the session's own projections instead — see
+ * {@link isAwaitingDecision}.
  * @module dsh-plugin-status-board/client/session-source
  */
 
 import type { SessionSignal } from '../shared/types.ts'
 
-/** Status words a snapshot may use for "blocked on the user". */
-const AWAITING_STATUSES: ReadonlySet<string> = new Set([
-  'awaiting',
-  'awaiting-decision',
-  'awaiting_decision',
-  'pending-decision',
-  'needs-decision',
-  'approval',
-])
+/** One team-task row of the Lead session's `agentTeam` projection. */
+export interface TeamTaskLike {
+  readonly status?: string | undefined
+  readonly ready?: boolean | undefined
+}
+
+/**
+ * The `userQuestions` projection face.
+ *
+ * `active` holds the questions currently waiting for a human answer; an empty
+ * or absent list means nothing is pending. The projection is the runtime's
+ * authoritative "the user owes this session an answer" signal.
+ */
+export interface UserQuestionsProjectionLike {
+  readonly active?: readonly unknown[] | undefined
+}
+
+/** One session's projection values (only the slices this plugin reads). */
+export interface ProjectionLike {
+  readonly values?:
+    | {
+        readonly userQuestions?: UserQuestionsProjectionLike | undefined
+        readonly agentTeam?:
+          | { readonly tasks?: readonly TeamTaskLike[] | undefined }
+          | undefined
+      }
+    | undefined
+}
 
 /** One session summary as the Client snapshot publishes it. */
 export interface SessionSummaryLike {
   readonly id?: string | undefined
   /** Title the browser renders in the sidebar. */
   readonly displayTitle?: string | undefined
-  /** Older/alternate title field some releases use. */
+  /** Alternate title field some releases carry. */
   readonly title?: string | undefined
   /** Working directory of the session, when known. */
   readonly cwd?: string | undefined
@@ -41,38 +62,19 @@ export interface SessionSummaryLike {
   readonly parentId?: string | undefined
   /** Whether the session's agent is currently working. */
   readonly running?: boolean | undefined
+  /** A session that has never exchanged a message. */
+  readonly blank?: boolean | undefined
   /** Newest activity timestamp, when the snapshot carries one. */
   readonly lastActivityAt?: number | undefined
   /** Creation/update timestamp used when `lastActivityAt` is absent. */
   readonly updatedAt?: number | undefined
-  /** Explicit "blocked on the user" flag, when the release publishes one. */
-  readonly awaitingDecision?: boolean | undefined
-  /** Coarse session status, when the release publishes one. */
-  readonly status?: string | undefined
-  /** Pending-interaction marker, when the release publishes one. */
-  readonly interaction?: string | undefined
 }
 
-/** One team-task row of the Lead session's `agentTeam` projection. */
-export interface TeamTaskLike {
-  readonly status?: string | undefined
-  readonly ready?: boolean | undefined
-}
-
-/** One session's projection values (the slice this plugin reads). */
-export interface ProjectionLike {
-  readonly values?:
-    | {
-        readonly agentTeam?:
-          | { readonly tasks?: readonly TeamTaskLike[] | undefined }
-          | undefined
-      }
-    | undefined
-}
-
-/** The session-list snapshot the Client publishes. */
+/** The session-list snapshot the Client publishes (`SessionListState`). */
 export interface SessionListLike {
   readonly byId?: Readonly<Record<string, SessionSummaryLike>> | undefined
+  /** `'pending'` until the first enumeration settles. */
+  readonly phase?: 'pending' | 'ready' | undefined
   readonly projectionsBySession?: Readonly<Record<string, ProjectionLike>> | undefined
 }
 
@@ -88,9 +90,7 @@ export interface SessionsFace {
 
 /**
  * Whether a session's team board holds a task that is both ready and pending —
- * i.e. a decision the Lead (and through it, the user) has to act on.
- *
- * @param projection - the session's projections, when the snapshot has them.
+ * a decision only the Lead (and through it, the user) can take.
  */
 export function hasReadyPendingTeamTask(projection: ProjectionLike | undefined): boolean {
   const tasks = projection?.values?.agentTeam?.tasks
@@ -99,18 +99,22 @@ export function hasReadyPendingTeamTask(projection: ProjectionLike | undefined):
 }
 
 /**
- * Read the "blocked on the user" state from whatever signal the snapshot
- * publishes.
+ * Whether the session is blocked on a human answer.
  *
- * Precedence is deliberate: an explicit flag wins, then a status word, then a
- * pending-interaction marker, then the team-task projection. Every branch is a
- * real field some Harness release exposes; none of them is required, so an
- * unknown shape simply yields `false`.
+ * Both branches are real, durable projections of the installed Harness:
+ *
+ * - `userQuestions.active` — the `ask_user_question` tool is parked waiting for
+ *   the user (including plan review, which is a question with a `plan-review`
+ *   intent).
+ * - `agentTeam.tasks` with `ready && pending` — a shared team task is unclaimed
+ *   and unblocked, so the Lead has to decide who takes it.
+ *
+ * A session with neither is not "awaiting a decision", however long it has been
+ * idle: idleness is not a request for the user.
  */
-export function isAwaitingDecision(summary: SessionSummaryLike, projection: ProjectionLike | undefined): boolean {
-  if (summary.awaitingDecision === true) return true
-  if (typeof summary.status === 'string' && AWAITING_STATUSES.has(summary.status)) return true
-  if (summary.interaction === 'pending' || summary.interaction === 'awaiting') return true
+export function isAwaitingDecision(projection: ProjectionLike | undefined): boolean {
+  const active = projection?.values?.userQuestions?.active
+  if (Array.isArray(active) && active.length > 0) return true
   return hasReadyPendingTeamTask(projection)
 }
 
@@ -121,8 +125,7 @@ export function isSubagentChild(summary: SessionSummaryLike): boolean {
 
 /** Pick the first non-blank title, falling back to the id. */
 function titleOf(summary: SessionSummaryLike, id: string): string {
-  const candidates = [summary.displayTitle, summary.title]
-  for (const candidate of candidates) {
+  for (const candidate of [summary.displayTitle, summary.title]) {
     if (typeof candidate === 'string') {
       const trimmed = candidate.trim()
       if (trimmed.length > 0) return trimmed
@@ -142,9 +145,12 @@ function lastActivityOf(summary: SessionSummaryLike): number {
 /**
  * Turn a session-list snapshot into the classifier's input.
  *
- * Subagent children are skipped: the board answers "which of my conversations
- * needs me", not "which fragment of a tree is busy". A child's work is already
- * visible through its parent's `running` state.
+ * Skipped rows, each for a reason the board's question demands:
+ * - subagent children — their work is already reflected on the parent, and the
+ *   board answers "which of my conversations needs me", not "which fragment is
+ *   busy";
+ * - blank sessions that never exchanged a message — they have no state to
+ *   report, and their default title (the workspace name) reads as a phantom row.
  *
  * @param list - the snapshot (may be `undefined` before the first publication).
  * @returns one signal per visible top-level session, in snapshot order.
@@ -160,18 +166,18 @@ export function collectSessionSignals(list: SessionListLike | undefined): Sessio
     if (typeof summary.id !== 'string' || summary.id.length === 0) continue
     if (seen.has(summary.id)) continue
     if (isSubagentChild(summary)) continue
+    if (summary.blank === true) continue
     seen.add(summary.id)
 
     const projection = list?.projectionsBySession?.[summary.id]
-    const signal: SessionSignal = {
+    signals.push({
       id: summary.id,
       title: titleOf(summary, summary.id),
       workspacePath: typeof summary.cwd === 'string' && summary.cwd.length > 0 ? summary.cwd : undefined,
       running: summary.running === true,
-      awaitingDecision: isAwaitingDecision(summary, projection),
+      awaitingDecision: isAwaitingDecision(projection),
       lastActivityAt: lastActivityOf(summary),
-    }
-    signals.push(signal)
+    })
   }
   return signals
 }

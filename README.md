@@ -41,7 +41,7 @@
 - **折叠状态记忆**：三块看板的展开/收起状态按用户偏好持久化（`localStorage`）。
 - **中英双语**：界面文案与插件管理页标题/描述均随 Harness 语言设置切换。
 - **主题自适应**：配色全部取自 Harness 主题令牌，浅色/深色主题自动跟随。
-- **键盘与读屏可用**：折叠按钮是真实 `<button>`，带 `aria-expanded` / `aria-controls`；标签同时播报看板名、动作与数量。
+- **键盘与读屏可用**：每块看板的标题是真实 `<h2>`，内部是展开/收起按钮（WAI-ARIA accordion 模式），带 `aria-expanded` 与始终可解析的 `aria-controls`；标签同时播报看板名、动作与数量。面板标题用 `aria-labelledby` 关联，DOM id 由 `useId` 生成，多开面板不冲突。
 - **空状态与截断提示**：空看板、被数量上限截断的「近期记录」都有明确说明，不静默丢弃数据。
 
 ---
@@ -144,7 +144,7 @@ lib/
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit，strict + exactOptionalPropertyTypes
-pnpm test        # vitest，112 个用例
+pnpm test        # vitest，166 个用例
 pnpm build       # 清理 → 声明文件 → 两半部打包 → Client 信封包装
 pnpm test:watch  # 监听模式
 ```
@@ -168,7 +168,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # 运行时快照 → 分类输入的唯一适配点
 │       └── styles.ts            # 主题令牌驱动的样式
 ├── locale/{zh,en}.json          # 界面文案 + 插件管理页元数据
-├── tests/                       # 112 个单元测试
+├── tests/                       # 166 个单元测试
 ├── scripts/                     # 清理与 Client 信封包装
 ├── cordis.patch.yml             # bundle 补丁（含默认配置）
 └── tsdown.config.ts             # 两半部独立构建
@@ -180,27 +180,32 @@ dsh-plugin-status-board/
 | :--- | :--- |
 | `board.test.ts` | 分类优先级、排序稳定性、时间窗口、截断计数、折叠状态 |
 | `config.test.ts` | 默认值、上下界钳制、非法类型回退 |
-| `i18n.test.ts` | 中英键对齐、无空串、占位符插值、相对时间 |
-| `session-source.test.ts` | 运行时快照适配、子会话过滤、异常行容错 |
-| `host.test.ts` | 配置路由方法处理、payload marker、effect 清理 |
+| `i18n.test.ts` | 中英键对齐、必需键校验、单遍占位符插值、相对时间 |
+| `session-source.test.ts` | 运行时快照适配、子会话/空白会话过滤、决策投影读取、异常行容错 |
+| `store.test.ts` | 订阅通知、变更检测、折叠持久化、配置晚到不覆盖用户选择、卸载语义 |
+| `panel.test.tsx` | 服务端渲染：三看板、折叠、aria 关系可解析、加载/空/错误态、主题令牌 |
+| `host.test.ts` | 配置路由 GET/HEAD/405、Allow 头、effect 清理、webServer 延迟挂载 |
 | `manifest.test.ts` | 清单/补丁/locale/图标/MIT/LICENSE 一致性 |
-| `artifacts.test.ts` | 构建产物：Host 导出、Client 信封、React 外置、字典内联 |
+| `artifacts.test.ts` | 构建产物：Host 真实导出、Client 信封、React 外置、字典内联、样式未被改写 |
 
 ---
 
 ## 常见问题
 
 **面板里看不到我的会话？**
-看板不列出由**子 Agent 派生**的会话（`origin: 'subagent'` 或带父会话 id 的行）——它们的工作状态已经体现在父会话上。这样列出来的是「你真正在对话的会话」，而不是树上的每个片段。
+看板只列出**顶层**会话：子 Agent 派生的会话（`origin: 'subagent'` 或带父会话 id 的行）已体现在父会话上；从未交换过消息的空白会话也没有状态可报，且其默认标题就是工作区名，容易读成幽灵行。这样列出的才是「你真正在对话的会话」。
 
 **为什么某会话在「待我决策」里但它其实还在跑？**
-这是刻意设计。「Agent 仍在跑」和「它在等你拍板才能继续」可以同时成立，后者更重要——它才是阻塞点。
+这是刻意设计。「Agent 仍在跑」和「它在等你拍板才能继续」可以同时成立，后者更重要——它才是阻塞点。判定读取的是运行时的两个真实投影：`userQuestions.active`（工具正在等待用户回答，含计划审阅）与 `agentTeam.tasks`（存在「已就绪且待认领」的团队任务）。
+
+**点击会话行会怎样？**
+通过 Harness 的 `uiWorkspace.openSession` 跳到该会话。若当前配置未提供该服务，行会渲染成静态文本而不是可点按钮——界面不会给出点不动的假按钮。
 
 **折叠状态存在哪里？**
 浏览器 `localStorage`，键名 `dsh-plugin-status-board.collapse.v1`。清除该项即恢复配置里的默认折叠方式。隐私模式下写入失败会自动降级为仅本次页面有效。
 
 **卸载插件后残留什么？**
-不残留。样式通过 Harness 的 `styles` 内置能力插入，随插件卸载移除；所有插槽注册和订阅都包在 `ctx.effect` 里，卸载即释放。
+不残留。样式是面板组件内的 `<style>` 元素，随组件卸载一并移除；所有插槽注册和订阅都包在 `ctx.effect` 里，卸载即释放。
 
 ---
 

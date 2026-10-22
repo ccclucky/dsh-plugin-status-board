@@ -41,7 +41,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 - **Remembers your collapse choices** — persisted per browser in `localStorage`.
 - **Bilingual** — UI copy and the Plugin Manager's title/description follow the Harness language setting (Chinese / English).
 - **Theme-aware** — every colour comes from Harness theme tokens, so light and dark themes follow automatically.
-- **Keyboard and screen-reader accessible** — the toggle is a real `<button>` with `aria-expanded` / `aria-controls`; its label announces the board, the action and the row count.
+- **Keyboard and screen-reader accessible** — each board's title is a real `<h2>` wrapping a disclosure `<button>` (the WAI-ARIA accordion pattern), with `aria-expanded` and an `aria-controls` that always resolves; the label announces the board, the action and the row count. The panel is named via `aria-labelledby`, and DOM ids come from `useId`, so two mounted panels never collide.
 - **Honest empty and truncation states** — an empty board and a capped "Recent records" board both say so; nothing is dropped silently.
 
 ---
@@ -144,7 +144,7 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 112 cases
+pnpm test        # vitest, 166 cases
 pnpm build       # clean → declarations → both halves → Client envelope wrap
 pnpm test:watch  # watch mode
 ```
@@ -168,7 +168,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # the single runtime-snapshot adapter
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 112 unit tests
+├── tests/                       # 166 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.ts             # two independent builds
@@ -180,27 +180,32 @@ dsh-plugin-status-board/
 | :--- | :--- |
 | `board.test.ts` | precedence, stable ordering, time window, truncation counts, collapse state |
 | `config.test.ts` | defaults, clamping, wrong-type fallback |
-| `i18n.test.ts` | zh/en key parity, no empty strings, interpolation, relative time |
-| `session-source.test.ts` | snapshot adaptation, subagent filtering, malformed-row tolerance |
-| `host.test.ts` | route method handling, payload marker, effect cleanup |
+| `i18n.test.ts` | zh/en key parity, required-key validation, single-pass interpolation, relative time |
+| `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, malformed rows |
+| `store.test.ts` | subscriptions, change detection, collapse persistence, late config must not clobber a click |
+| `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens |
+| `host.test.ts` | GET/HEAD/405 handling, Allow header, effect cleanup, late-mounting webServer |
 | `manifest.test.ts` | manifest / patch / locale / icon / MIT LICENSE consistency |
-| `artifacts.test.ts` | built output: Host exports, Client envelope, external React, inlined dicts |
+| `artifacts.test.ts` | built output: real Host exports, Client envelope, external React, inlined dicts, unrewritten styles |
 
 ---
 
 ## FAQ
 
 **Why don't I see some of my sessions?**
-The board omits sessions spawned as **subagent children** (`origin: 'subagent'`, or a row carrying a parent id). Their work is already reflected on the parent session, and listing them would turn the board into a tree dump instead of a list of the conversations you are actually having.
+The board lists top-level sessions only. Sessions spawned as **subagent children** (`origin: 'subagent'`, or a row carrying a parent id) are already reflected on their parent, and a **blank** session that never exchanged a message has no state to report — its default title is just the workspace name, which reads as a phantom row.
 
 **A session is on "Needs my decision" but it is still running — why?**
-By design. "The agent is still working" and "it cannot proceed without your call" can both be true, and the second one is the blocker.
+By design. "The agent is still working" and "it cannot proceed without your call" can both be true, and the second one is the blocker. The decision is derived from two real runtime projections: `userQuestions.active` (a tool waiting for the human, plan review included) and `agentTeam.tasks` (a ready, unclaimed team task).
+
+**What happens when I click a session row?**
+It navigates through the Harness `uiWorkspace.openSession` service. When that service is not part of the composition, rows render as static text rather than as buttons that do nothing.
 
 **Where is the collapse state stored?**
 Browser `localStorage` under `dsh-plugin-status-board.collapse.v1`. Clear that key to fall back to the configured default. If storage is unavailable (private mode), the choice degrades to this page's lifetime automatically.
 
 **What is left behind after uninstall?**
-Nothing. Styles are inserted through Harness's `styles` builtin and removed on unload; every slot registration and subscription is owned by a `ctx.effect`, so unload releases it.
+Nothing. The styles are a `<style>` element inside the panel component, so unmounting removes them; every slot registration and subscription is owned by a `ctx.effect`, so unload releases it.
 
 ---
 

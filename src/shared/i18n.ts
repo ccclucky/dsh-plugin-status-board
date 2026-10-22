@@ -71,10 +71,69 @@ export type MessageParams = Readonly<Record<string, string | number>>
 /** Translate one dotted key for the active locale. */
 export type Translate = (key: MessageKey, params?: MessageParams) => string
 
+/**
+ * Dotted paths every locale file must provide.
+ *
+ * Only the keys a *missing* one would visibly break are required: the Plugin
+ * Manager's metadata, the three board names, and the empty/error copy. A
+ * missing decorative key degrades to the English phrase through
+ * {@link createTranslate}; a missing board name would render a raw dotted key in
+ * the primary navigation, which is a defect worth reporting once.
+ */
+const REQUIRED_PATHS = [
+  'meta.title',
+  'meta.description',
+  'panel.title',
+  'panel.subtitle',
+  'bucket.decision',
+  'bucket.executing',
+  'bucket.recent',
+  'bucket.expand',
+  'bucket.collapse',
+  'state.empty',
+  'state.error',
+  'summary.total',
+] as const
+
+/** Report which required paths a raw locale file is missing. */
+export function missingLocalePaths(value: unknown): string[] {
+  return REQUIRED_PATHS.filter(path => typeof lookup(value as LocaleFile, path) !== 'string')
+}
+
+/**
+ * Validate a locale resource and fall back when it is incomplete.
+ *
+ * The build ships these files, so an incomplete one means a packaging defect;
+ * the panel still has to render, so the fallback dictionary wins and the defect
+ * is reported once on the console instead of surfacing as raw dotted keys in the
+ * sidebar.
+ *
+ * @param id - locale id, for the report.
+ * @param raw - the imported JSON value.
+ * @param fallback - already-validated dictionary to use when `raw` is
+ *   incomplete.
+ */
+function loadDictionary(id: LocaleId, raw: unknown, fallback: LocaleFile | undefined): LocaleFile {
+  const missing = missingLocalePaths(raw)
+  if (missing.length === 0) return raw as LocaleFile
+  console.error(
+    `[dsh-plugin-status-board] locale/${id}.json is missing ${missing.join(', ')}` +
+      (fallback === undefined ? '' : '; falling back to en'),
+  )
+  return fallback ?? (raw as LocaleFile)
+}
+
+// English is validated first and then acts as the fallback for every other
+// locale, so a broken resource degrades to readable English rather than to raw
+// dotted keys. Declaration order matters here: `zh` must not be evaluated
+// before `en` exists.
+const enDictionary = loadDictionary('en', enFile, undefined)
+const zhDictionary = loadDictionary('zh', zhFile, enDictionary)
+
 /** The two dictionaries, keyed by locale id. */
 export const DICTIONARIES: Readonly<Record<LocaleId, LocaleFile>> = {
-  zh: zhFile as LocaleFile,
-  en: enFile as LocaleFile,
+  zh: zhDictionary,
+  en: enDictionary,
 }
 
 /** The locale namespace registered with the Harness locale service. */
@@ -101,18 +160,21 @@ export function lookup(dictionary: LocaleFile, key: string): string | undefined 
 }
 
 /**
- * Substitute `{name}` placeholders.
+ * Substitute `{name}` placeholders in one pass.
  *
- * An unknown placeholder is left verbatim rather than replaced with `''`, so a
- * missing parameter shows up in review instead of silently deleting copy.
+ * A single pass matters: substituting parameter by parameter would re-scan text
+ * that a previous substitution just inserted, so a value containing `{b}` would
+ * be rewritten by the later `b` replacement — a result that depended on object
+ * key order. An unknown placeholder is left verbatim rather than replaced with
+ * `''`, so a missing parameter shows up in review instead of silently deleting
+ * copy.
  */
 export function formatMessage(template: string, params?: MessageParams): string {
   if (params === undefined) return template
-  let text = template
-  for (const [name, value] of Object.entries(params)) {
-    text = text.replaceAll(`{${name}}`, String(value))
-  }
-  return text
+  return template.replace(/\{([^{}]+)\}/g, (match, name: string) => {
+    if (!Object.prototype.hasOwnProperty.call(params, name)) return match
+    return String(params[name])
+  })
 }
 
 /**

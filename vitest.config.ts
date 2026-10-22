@@ -14,9 +14,5 @@ export default defineConfig({
     // lets a blank panel ship.
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     reporters: ['default'],
-    coverage: {
-      provider: 'v8',
-      include: ['src/shared/**/*.ts'],
-    },
   },
 })

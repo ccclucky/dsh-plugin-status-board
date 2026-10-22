@@ -1,9 +1,10 @@
 /**
  * The runtime adapter: snapshot → SessionSignal.
  *
- * The adapter is the only place that knows the Harness snapshot shape, so its
- * tests double as the documentation of what "awaiting a decision" means for
- * each signal a release may publish.
+ * Every field this adapter reads was verified against the installed Harness
+ * (`@deepseek-ai/dsh-api-session-controller`, `SessionListState` /
+ * `SessionSummary` / `SessionProjectionSnapshot`), so these tests double as the
+ * contract for "what makes a session await a decision".
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -23,57 +24,43 @@ function summary(overrides: SessionSummaryLike & { id: string }): SessionSummary
 function list(
   summaries: readonly SessionSummaryLike[],
   projections?: Record<string, ProjectionLike>,
+  phase: 'pending' | 'ready' = 'ready',
 ): SessionListLike {
   const byId: Record<string, SessionSummaryLike> = {}
   for (const item of summaries) {
     if (item.id !== undefined) byId[item.id] = item
   }
-  return { byId, projectionsBySession: projections }
+  return { byId, phase, projectionsBySession: projections }
 }
 
 describe('isAwaitingDecision', () => {
-  it('honours the explicit flag', () => {
-    expect(isAwaitingDecision(summary({ id: 'a', awaitingDecision: true }), undefined)).toBe(true)
+  it('is true while a user question is parked on the session', () => {
+    const projection: ProjectionLike = { values: { userQuestions: { active: [{ id: 'q1' }] } } }
+    expect(isAwaitingDecision(projection)).toBe(true)
   })
 
-  it('recognises each status word a release may publish', () => {
-    for (const status of ['awaiting', 'awaiting-decision', 'awaiting_decision', 'pending-decision', 'needs-decision', 'approval']) {
-      expect(isAwaitingDecision(summary({ id: 'a', status }), undefined), status).toBe(true)
-    }
+  it('is false when the question list is empty or absent', () => {
+    expect(isAwaitingDecision({ values: { userQuestions: { active: [] } } })).toBe(false)
+    expect(isAwaitingDecision({ values: { userQuestions: {} } })).toBe(false)
+    expect(isAwaitingDecision({ values: {} })).toBe(false)
+    expect(isAwaitingDecision(undefined)).toBe(false)
   })
 
-  it('does not treat an ordinary status as a decision', () => {
-    for (const status of ['idle', 'running', 'completed', 'archived']) {
-      expect(isAwaitingDecision(summary({ id: 'a', status }), undefined), status).toBe(false)
-    }
-  })
-
-  it('recognises a pending interaction marker', () => {
-    expect(isAwaitingDecision(summary({ id: 'a', interaction: 'pending' }), undefined)).toBe(true)
-    expect(isAwaitingDecision(summary({ id: 'a', interaction: 'awaiting' }), undefined)).toBe(true)
-    expect(isAwaitingDecision(summary({ id: 'a', interaction: 'none' }), undefined)).toBe(false)
-  })
-
-  it('recognises a ready pending team task in the session projection', () => {
+  it('is true for a ready pending team task', () => {
     const projection: ProjectionLike = {
       values: { agentTeam: { tasks: [{ status: 'pending', ready: true }] } },
     }
-    expect(isAwaitingDecision(summary({ id: 'a' }), projection)).toBe(true)
+    expect(isAwaitingDecision(projection)).toBe(true)
   })
 
   it('ignores a blocked or already claimed team task', () => {
-    const blocked: ProjectionLike = {
-      values: { agentTeam: { tasks: [{ status: 'pending', ready: false }] } },
-    }
-    const claimed: ProjectionLike = {
-      values: { agentTeam: { tasks: [{ status: 'in_progress', ready: true }] } },
-    }
-    expect(isAwaitingDecision(summary({ id: 'a' }), blocked)).toBe(false)
-    expect(isAwaitingDecision(summary({ id: 'a' }), claimed)).toBe(false)
+    expect(isAwaitingDecision({ values: { agentTeam: { tasks: [{ status: 'pending', ready: false }] } } })).toBe(false)
+    expect(isAwaitingDecision({ values: { agentTeam: { tasks: [{ status: 'in_progress', ready: true }] } } })).toBe(false)
   })
 
-  it('defaults to false for an empty summary', () => {
-    expect(isAwaitingDecision({ id: 'a' }, undefined)).toBe(false)
+  it('survives a projection whose values have the wrong shape', () => {
+    expect(isAwaitingDecision({ values: { userQuestions: 'x' as never } })).toBe(false)
+    expect(isAwaitingDecision({ values: { agentTeam: { tasks: 'x' as never } } })).toBe(false)
   })
 })
 
@@ -118,7 +105,7 @@ describe('collectSessionSignals', () => {
           displayTitle: '  Fix the parser  ',
           cwd: 'D:/work/app',
           running: true,
-          lastActivityAt: 1_700_000_000_000,
+          updatedAt: 1_700_000_000_000,
         }),
       ]),
     )
@@ -158,12 +145,16 @@ describe('collectSessionSignals', () => {
 
   it('skips subagent children so the board lists conversations', () => {
     const signals = collectSessionSignals(
-      list([
-        summary({ id: 'root' }),
-        summary({ id: 'child', origin: 'subagent', parentId: 'root' }),
-      ]),
+      list([summary({ id: 'root' }), summary({ id: 'child', origin: 'subagent', parentId: 'root' })]),
     )
     expect(signals.map(s => s.id)).toEqual(['root'])
+  })
+
+  it('skips blank sessions that never exchanged a message', () => {
+    const signals = collectSessionSignals(
+      list([summary({ id: 'real' }), summary({ id: 'draft', blank: true })]),
+    )
+    expect(signals.map(s => s.id)).toEqual(['real'])
   })
 
   it('skips malformed rows instead of throwing', () => {
@@ -185,9 +176,7 @@ describe('collectSessionSignals', () => {
 
   it('reads the decision signal from the session projection', () => {
     const signals = collectSessionSignals(
-      list([summary({ id: 'a' })], {
-        a: { values: { agentTeam: { tasks: [{ status: 'pending', ready: true }] } } },
-      }),
+      list([summary({ id: 'a' })], { a: { values: { userQuestions: { active: [{ id: 'q' }] } } } }),
     )
     expect(signals[0]?.awaitingDecision).toBe(true)
   })

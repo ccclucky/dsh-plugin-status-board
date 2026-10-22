@@ -61,6 +61,7 @@
       "platform": "web",
       "immediately": true,
       "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots"
       ]
@@ -74,20 +75,17 @@
     "test:watch": "vitest",
     "verify": "node scripts/verify-build.mjs",
     "clean": "node scripts/clean.mjs",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.5"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-api-session-controller": "^0.2.0-rc.2",
     "@deepseek-ai/dsh-client-locale": "^0.2.0-rc.2",
     "react": "^18.2.0"
-  },
-  "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-client-locale": {
-      "optional": true
-    }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",

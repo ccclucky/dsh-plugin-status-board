@@ -3,29 +3,57 @@
  *
  * Design notes (Nielsen's heuristics where they bite):
  * - *Visibility of system status*: every board carries a live row count, so a
- *   collapsed board still tells the user how much it hides.
+ *   collapsed board still says how much it hides; loading and error states are
+ *   distinct from "no sessions".
  * - *Recognition over recall*: the two boards that need the user (decision) or
- *   describe current work (executing) are always expanded unless configured
+ *   describe current work (executing) stay expanded unless configured
  *   otherwise; only the archival board starts collapsed.
  * - *Aesthetic and minimalist design*: a row shows a state dot, a title and one
  *   meta line; the workspace path is a tooltip, not a third competing column.
- * - *Accessibility*: the toggle is a real `<button>` with `aria-expanded` and
- *   `aria-controls`; the label names the board, the action and the count.
+ * - *User control and freedom*: a failed read offers a retry instead of a dead
+ *   end.
+ * - *Accessibility*: each header is an `<h2>` wrapping a disclosure `<button>`
+ *   (the WAI-ARIA accordion pattern), so the heading survives in the
+ *   accessibility tree while the button keeps button semantics. `aria-controls`
+ *   always resolves: the region stays mounted and is hidden with `hidden`.
  * @module dsh-plugin-status-board/client/Panel
  */
 
-import { useSyncExternalStore, type CSSProperties, type ReactElement } from 'react'
+import { useEffect, useId, useState, useSyncExternalStore, type CSSProperties, type ReactElement } from 'react'
 import { BUCKET_IDS, type BucketId, type BoardEntry } from '../shared/types.ts'
+import { bucketToggleLabel, isCollapsed, totalRows } from '../shared/board.ts'
 import { createTranslate, formatRelativeTime, type MessageKey, type Translate } from '../shared/i18n.ts'
-import type { BoardStore, BoardState } from './store.ts'
+import type { BoardState, BoardStore } from './store.ts'
 import { PANEL_CSS } from './styles.ts'
 
-/** Owner props the panel receives. */
+/** The panel's props: the store it renders plus the navigation seam. */
 export interface PanelProps {
   /** The store this panel renders; created by the Client half's `apply`. */
   readonly store: BoardStore
-  /** Open one session in the main column. */
+  /** Open one session in the main column; absent when navigation is unavailable. */
   readonly onOpenSession?: ((sessionId: string) => void) | undefined
+}
+
+/** How often relative timestamps are refreshed while nothing else changes. */
+const CLOCK_INTERVAL_MS = 30_000
+
+/**
+ * A coarse clock for relative timestamps.
+ *
+ * The store only republishes when session data changes, so a board left open on
+ * an idle page would otherwise keep saying "just now" for an hour. A 30-second
+ * tick is cheap, stops on unmount, and keeps the text honest without making the
+ * store own a timer.
+ */
+function useRelativeClock(): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), CLOCK_INTERVAL_MS)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [])
+  return now
 }
 
 /** The chevron drawn by the toggle; pure markup, no icon dependency. */
@@ -80,10 +108,12 @@ function Row({
   readonly onOpen: ((sessionId: string) => void) | undefined
 }): ReactElement {
   const meta = formatRelativeTime(now, entry.lastActivityAt, translate)
-  const title = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
+  // The workspace path is useful but would cost a third column; the native
+  // tooltip carries it without competing for the row's width.
+  const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
   const content = [
     <span className="status-board__dot" aria-hidden="true" key="dot" />,
-    <span className="status-board__row-title" title={title} key="title">
+    <span className="status-board__row-title" key="title">
       {entry.title}
     </span>,
     <span className="status-board__row-meta" key="meta">
@@ -91,11 +121,11 @@ function Row({
     </span>,
   ]
 
-  // A row is only interactive when the profile exposes a way to open sessions;
+  // A row is interactive only when the profile exposes a way to open sessions;
   // otherwise it renders as static text so the affordance never lies.
   if (onOpen === undefined) {
     return (
-      <li className="status-board__row" data-state={bucket} title={title}>
+      <li className="status-board__row" data-state={bucket} title={tooltip}>
         {content}
       </li>
     )
@@ -106,7 +136,7 @@ function Row({
         type="button"
         className="status-board__row"
         data-state={bucket}
-        title={title}
+        title={tooltip}
         aria-label={`${translate('action.open')}: ${entry.title}`}
         onClick={() => onOpen(entry.id)}
       >
@@ -122,99 +152,90 @@ function Bucket({
   state,
   store,
   translate,
+  now,
   onOpenSession,
 }: {
   readonly id: BucketId
   readonly state: BoardState
   readonly store: BoardStore
   readonly translate: Translate
+  readonly now: number
   readonly onOpenSession: ((sessionId: string) => void) | undefined
 }): ReactElement | null {
-  const index = BUCKET_IDS.indexOf(id)
-  const board = state.board.buckets[index]
+  const board = state.board.buckets.find(candidate => candidate.id === id)
   if (board === undefined) return null
 
-  const collapsed = state.collapse[id]
+  // One `useId` per board keeps the DOM ids unique when two panels mount at
+  // once (split view, a future right-hand dock), which a constant id cannot.
+  const instanceId = useId()
+  const headingId = `status-board-heading-${instanceId}`
+  const regionId = `status-board-region-${instanceId}`
+
+  const collapsed = isCollapsed(state.collapse, id)
   const count = board.entries.length
   const name = translate(`bucket.${id}` as MessageKey)
-  const hintKey = (`bucket.${id}Hint`) as MessageKey
-  const hint = translate(hintKey, { hours: state.board.windowHours })
-  const regionId = `status-board-region-${id}`
+  const hint = translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
 
   // An empty board is hidden when the operator turned headers off; the header
   // still renders otherwise so the three-column rhythm stays stable.
   if (count === 0 && !state.config.showEmptyBuckets) return null
 
-  const label = translate(collapsed ? 'bucket.expand' : 'bucket.collapse', { name, count })
-
   return (
-    <section className="status-board__card" data-bucket={id} aria-labelledby={`status-board-heading-${id}`}>
-      <button
-        type="button"
-        className="status-board__toggle"
-        aria-expanded={!collapsed}
-        aria-controls={regionId}
-        aria-label={label}
-        onClick={() => store.toggle(id)}
-      >
-        <Chevron collapsed={collapsed} />
-        <span className="status-board__name" id={`status-board-heading-${id}`} role="heading" aria-level={2}>
-          {name}
-        </span>
-        <span className="status-board__count" aria-hidden="true">
-          {count}
-        </span>
-      </button>
+    <section className="status-board__card" data-bucket={id} aria-labelledby={headingId}>
+      <h2 className="status-board__heading" id={headingId}>
+        <button
+          type="button"
+          className="status-board__toggle"
+          aria-expanded={!collapsed}
+          aria-controls={regionId}
+          aria-label={bucketToggleLabel(translate, name, collapsed, count)}
+          onClick={() => store.toggle(id)}
+        >
+          <Chevron collapsed={collapsed} />
+          <span className="status-board__name">{name}</span>
+          <span className="status-board__count" aria-hidden="true">
+            {count}
+          </span>
+        </button>
+      </h2>
       <p className="status-board__hint">{hint}</p>
-      {collapsed ? null : (
-        <div id={regionId} role="region" aria-label={name}>
-          {count === 0 ? (
-            <p className="status-board__empty">{translate('bucket.empty')}</p>
-          ) : (
-            <ul className="status-board__rows">
-              {board.entries.map(entry => (
-                <Row
-                  key={entry.id}
-                  entry={entry}
-                  bucket={id}
-                  translate={translate}
-                  now={state.board.generatedAt}
-                  onOpen={onOpenSession}
-                />
-              ))}
-            </ul>
-          )}
-          {board.truncated > 0 ? (
-            <p className="status-board__truncated">{translate('summary.truncated', { count: board.truncated })}</p>
-          ) : null}
-        </div>
-      )}
+      {/* Mounted even while collapsed so `aria-controls` always resolves to a
+          real element (ARIA requires IDREFs to resolve). */}
+      <div id={regionId} role="region" aria-label={name} hidden={collapsed}>
+        {count === 0 ? (
+          <p className="status-board__empty">{translate('bucket.empty')}</p>
+        ) : (
+          <ul className="status-board__rows">
+            {board.entries.map(entry => (
+              <Row
+                key={entry.id}
+                entry={entry}
+                bucket={id}
+                translate={translate}
+                now={now}
+                onOpen={onOpenSession}
+              />
+            ))}
+          </ul>
+        )}
+        {board.truncated > 0 ? (
+          <p className="status-board__truncated">{translate('summary.truncated', { count: board.truncated })}</p>
+        ) : null}
+      </div>
     </section>
   )
 }
 
 /**
- * The panel component.
+ * The board panel.
  *
- * The store arrives as a prop rather than through a module-level handle: a
- * module singleton would be wrong on two counts — it breaks when two panel
- * instances mount (a split view), and it leaves a stale store behind after an
- * HMR reload. The Client half closes over the store it created in `apply`, so
- * the panel always reads the live one.
- *
- * @param props - the store plus owner-supplied seams.
+ * @param props - the store plus the navigation seam.
  */
 export function BoardPanel({ store, onOpenSession }: PanelProps): ReactElement {
   return <BoardPanelBody store={store} onOpenSession={onOpenSession} />
 }
 
-/**
- * The subscribed body.
- *
- * Split from {@link BoardPanel} because `useSyncExternalStore` may not run
- * conditionally, and the store can legitimately be absent while the Client half
- * is still wiring itself up.
- */
+/** The subscribed body. */
 function BoardPanelBody({
   store,
   onOpenSession,
@@ -224,17 +245,17 @@ function BoardPanelBody({
 }): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
-  const headingId = 'status-board-title'
-
-  const total = BUCKET_IDS.reduce((sum, id) => sum + state.board.counts[id], 0)
+  const now = useRelativeClock()
+  const headingId = `status-board-title-${useId()}`
+  const total = totalRows(state.board)
 
   return (
-    <div className="status-board" role="region" aria-labelledby={headingId} aria-label={translate('a11y.panel')}>
+    <div className="status-board" role="region" aria-labelledby={headingId}>
       {/* Component-local styles: React removes them when the panel unmounts, so
           the plugin never leaves a global stylesheet behind. */}
       <style>{PANEL_CSS}</style>
       <div className="status-board__head">
-        <div className="status-board__heading">
+        <div className="status-board__heading-group">
           <h1 className="status-board__title" id={headingId}>
             {translate('panel.title')}
           </h1>
@@ -244,9 +265,12 @@ function BoardPanelBody({
       </div>
 
       {state.status === 'error' ? (
-        <p className="status-board__alert" role="alert">
-          {translate('state.error')}
-        </p>
+        <div className="status-board__alert" role="alert">
+          <span>{translate('state.error')}</span>
+          <button type="button" className="status-board__retry" onClick={() => store.refresh()}>
+            {translate('state.retry')}
+          </button>
+        </div>
       ) : null}
 
       <div className="status-board__grid">
@@ -257,12 +281,19 @@ function BoardPanelBody({
             state={state}
             store={store}
             translate={translate}
+            now={now}
             onOpenSession={onOpenSession}
           />
         ))}
       </div>
 
-      {total === 0 && state.status === 'ready' ? (
+      {state.status === 'loading' && total === 0 ? (
+        <p className="status-board__empty" role="status">
+          {translate('state.loading')}
+        </p>
+      ) : null}
+
+      {state.status === 'ready' && total === 0 ? (
         <p className="status-board__empty">{translate('state.empty')}</p>
       ) : null}
     </div>

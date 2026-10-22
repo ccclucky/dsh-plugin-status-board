@@ -9,16 +9,17 @@
  * - the Host-published configuration (fetched once, then fixed for the page),
  * - the user's collapse choices (persisted in `localStorage`).
  *
- * The store owns no timers and no polling: the Harness already publishes the
- * session list, so the board re-derives on each legitimate snapshot change.
+ * The store owns no polling: the Harness already publishes the session list, so
+ * the board re-derives on each legitimate snapshot change. (The view refreshes
+ * its relative timestamps locally; see `Panel.tsx`.)
  * @module dsh-plugin-status-board/client/store
  */
 
-import { buildBoard } from '../shared/board.ts'
-import { CONFIG_DEFAULTS, resolveConfig } from '../shared/config.ts'
+import { buildBoard, resolveCollapse, toggleCollapse } from '../shared/board.ts'
+import { resolveConfig } from '../shared/config.ts'
 import { STATUS_BOARD_CONFIG_MARKER, STATUS_BOARD_CONFIG_PATH } from '../shared/route.ts'
 import { pickLocale, type LocaleId } from '../shared/i18n.ts'
-import { BUCKET_IDS, type BoardSnapshot, type BucketId, type CollapseState, type ResolvedStatusBoardConfig } from '../shared/types.ts'
+import { BUCKET_IDS, type BoardSnapshot, type BucketId, type CollapseState, type ResolvedStatusBoardConfig, type StatusBoardConfig } from '../shared/types.ts'
 import { collectSessionSignals, type SessionsFace } from './session-source.ts'
 
 /** The minimal storage face the store needs (browser `localStorage` subset). */
@@ -27,11 +28,14 @@ export interface CollapseStorage {
   setItem(key: string, value: string): void
 }
 
-/** Locale service face (mirrored structurally; see the Client half's header). */
+/** Locale service face (mirrored structurally). */
 export interface LocaleFace {
   getSnapshot(): { active: string }
   subscribe(listener: () => void): () => void
 }
+
+/** Loading state of the board's data. */
+export type BoardStatus = 'loading' | 'ready' | 'error'
 
 /** One immutable view state. */
 export interface BoardState {
@@ -41,8 +45,11 @@ export interface BoardState {
   readonly collapse: CollapseState
   /** Configuration in force (Host-published, or defaults). */
   readonly config: ResolvedStatusBoardConfig
-  /** `'error'` only when the Harness exposes no session list at all. */
-  readonly status: 'loading' | 'ready' | 'error'
+  /**
+   * `'loading'` while the Harness is still enumerating sessions, `'error'` when
+   * the profile exposes no session list at all, otherwise `'ready'`.
+   */
+  readonly status: BoardStatus
   /** Active locale id, resolved from the Harness locale service. */
   readonly locale: LocaleId
 }
@@ -53,6 +60,14 @@ export interface BoardStore {
   subscribe(listener: () => void): () => void
   /** Flip one board, persisting the choice. */
   toggle(id: BucketId): void
+  /**
+   * Re-read the Host configuration and republish the derived state.
+   *
+   * The view exposes this behind the error state's retry control and its
+   * refresh action: a transient failure to reach the Host half must be
+   * recoverable without reloading the page (Nielsen: help users recover).
+   */
+  refresh(): void
   /** Stop every subscription (plugin unload / HMR). */
   dispose(): void
 }
@@ -109,19 +124,49 @@ export function serializeCollapse(state: CollapseState): string {
 }
 
 /**
+ * Narrow an untrusted JSON value into a `StatusBoardConfig`.
+ *
+ * The Host is not an adversarial party, but it can be an *older or newer*
+ * build, and a proxy can answer in its place. Unknown keys are dropped and
+ * wrong-typed values are omitted, so `resolveConfig` then applies its own
+ * defaults and bounds instead of receiving `as never` nonsense.
+ */
+export function toStatusBoardConfig(value: unknown): StatusBoardConfig | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  const config: {
+    recentWindowHours?: number
+    maxRecent?: number
+    defaultCollapsed?: StatusBoardConfig['defaultCollapsed']
+    showEmptyBuckets?: boolean
+  } = {}
+  if (typeof record.recentWindowHours === 'number') config.recentWindowHours = record.recentWindowHours
+  if (typeof record.maxRecent === 'number') config.maxRecent = record.maxRecent
+  if (typeof record.defaultCollapsed === 'string') {
+    config.defaultCollapsed = record.defaultCollapsed as StatusBoardConfig['defaultCollapsed']
+  }
+  if (typeof record.showEmptyBuckets === 'boolean') config.showEmptyBuckets = record.showEmptyBuckets
+  return config
+}
+
+/**
  * Fetch the Host-published configuration.
  *
- * Every failure path is a fallback, never an exception: the panel must render
- * on a deployment whose Host half is absent (installed but disabled), or while
- * the web server is still starting.
+ * Every failure path is a fallback, never an exception: the panel must render on
+ * a deployment whose Host half is absent (installed but disabled), on a
+ * non-browser host, or while the web server is still starting.
  *
  * @param fetchImpl - the browser `fetch`.
  * @param timeoutMs - bound on the request so a hung server cannot block paint.
  */
 export async function loadPublishedConfig(
-  fetchImpl: typeof fetch,
+  fetchImpl: typeof fetch | undefined,
   timeoutMs = 1_500,
 ): Promise<ResolvedStatusBoardConfig | undefined> {
+  // A missing `fetch` is not an error worth surfacing: the board simply keeps
+  // its documented defaults.
+  if (typeof fetchImpl !== 'function') return undefined
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
@@ -134,7 +179,7 @@ export async function loadPublishedConfig(
     if (!response.ok) return undefined
     const payload = (await response.json()) as { marker?: unknown; config?: unknown }
     if (payload.marker !== STATUS_BOARD_CONFIG_MARKER) return undefined
-    return resolveConfig(payload.config as never)
+    return resolveConfig(toStatusBoardConfig(payload.config))
   } catch {
     return undefined
   } finally {
@@ -142,15 +187,22 @@ export async function loadPublishedConfig(
   }
 }
 
-/** Resolve the initial collapse state from storage, then the configured default. */
-function initialCollapse(config: ResolvedStatusBoardConfig, storage: CollapseStorage | undefined): CollapseState {
-  const stored = storage === undefined ? undefined : parseCollapse(storage.getItem(COLLAPSE_STORAGE_KEY))
-  if (stored !== undefined) return stored
-  const mode = config.defaultCollapsed
-  return {
-    decision: mode === 'all' || mode === 'decision',
-    executing: mode === 'all' || mode === 'executing',
-    recent: mode === 'all' || mode === 'recent',
+/**
+ * Resolve the initial collapse state: a stored user choice wins, otherwise the
+ * configured default applies.
+ */
+function initialState(config: ResolvedStatusBoardConfig, storage: CollapseStorage | undefined): CollapseState {
+  const stored = readStoredCollapse(storage)
+  return stored ?? resolveCollapse(config.defaultCollapsed)
+}
+
+/** Read the persisted collapse state, tolerating unavailable or throwing storage. */
+function readStoredCollapse(storage: CollapseStorage | undefined): CollapseState | undefined {
+  if (storage === undefined) return undefined
+  try {
+    return parseCollapse(storage.getItem(COLLAPSE_STORAGE_KEY))
+  } catch {
+    return undefined
   }
 }
 
@@ -163,20 +215,16 @@ function initialCollapse(config: ResolvedStatusBoardConfig, storage: CollapseSto
 export function createBoardStore(options: BoardStoreOptions): BoardStore {
   const listeners = new Set<() => void>()
   const now = options.now ?? (() => Date.now())
+  const storage = options.storage
 
   let config: ResolvedStatusBoardConfig = resolveConfig(undefined)
-  let collapse: CollapseState = initialCollapse(config, options.storage)
-  let state: BoardState = compute()
+  let collapse: CollapseState = initialState(config, storage)
+  /** True once the user has expressed a preference this page load. */
+  let userTouched = readStoredCollapse(storage) !== undefined
   let disposed = false
+  let state: BoardState = compute()
 
-  /** Rebuild the immutable state and notify subscribers when it changed. */
-  function recompute(): void {
-    if (disposed) return
-    const next = compute()
-    if (sameState(state, next)) return
-    state = next
-    for (const listener of listeners) listener()
-  }
+  const disposers: Array<() => void> = []
 
   /** Build the current state from every input. */
   function compute(): BoardState {
@@ -186,12 +234,25 @@ export function createBoardStore(options: BoardStoreOptions): BoardStore {
       board: buildBoard(signals, config, now()),
       collapse,
       config,
-      status: options.sessions?.list === undefined ? 'error' : 'ready',
+      status: statusOf(list),
       locale: pickLocale(options.locale?.getSnapshot().active),
     }
   }
 
-  const disposers: Array<() => void> = []
+  /** Derive the data state from the session-list phase. */
+  function statusOf(list: ReturnType<NonNullable<SessionsFace['list']>['getSnapshot']> | undefined): BoardStatus {
+    if (options.sessions?.list === undefined || list === undefined) return 'error'
+    return list.phase === 'pending' ? 'loading' : 'ready'
+  }
+
+  /** Rebuild the immutable state and notify subscribers when it changed. */
+  function recompute(): void {
+    if (disposed) return
+    const next = compute()
+    if (sameState(state, next)) return
+    state = next
+    for (const listener of listeners) listener()
+  }
 
   // Live input: the Harness session list.
   const sessionList = options.sessions?.list
@@ -206,39 +267,62 @@ export function createBoardStore(options: BoardStoreOptions): BoardStore {
 
   // Configuration arrives asynchronously; the board renders with defaults until
   // it lands, which keeps the first paint instant.
-  const loadConfig = options.loadConfig ?? (() => loadPublishedConfig(fetch))
-  void loadConfig()
-    .then(published => {
-      if (disposed || published === undefined) return
-      config = published
-      // A stored collapse choice outranks the configured default; only an
-      // untouched board adopts the freshly published default.
-      if (options.storage?.getItem(COLLAPSE_STORAGE_KEY) == null) {
-        collapse = initialCollapse(published, undefined)
-      }
-      recompute()
-    })
-    .catch(() => {})
+  const loadConfig = options.loadConfig ?? (() => loadPublishedConfig(globalThis.fetch))
+
+  /** Fetch the configuration once and fold it into the state. */
+  function syncConfig(): void {
+    loadConfig()
+      .then(published => {
+        if (disposed || published === undefined) return
+        config = published
+        // Adopt the newly published default ONLY while the user has expressed no
+        // preference; otherwise their clicks would be silently reverted when the
+        // config lands a moment later.
+        if (!userTouched) collapse = resolveCollapse(published.defaultCollapsed)
+        recompute()
+      })
+      .catch(() => {
+        // A failed configuration load is not a rendering failure: the documented
+        // defaults stay in force.
+      })
+  }
+
+  syncConfig()
 
   return {
     getSnapshot: () => state,
     subscribe(listener) {
+      if (disposed) return () => {}
       listeners.add(listener)
       return () => {
         listeners.delete(listener)
       }
     },
     toggle(id) {
-      collapse = { ...collapse, [id]: !collapse[id] }
-      try {
-        options.storage?.setItem(COLLAPSE_STORAGE_KEY, serializeCollapse(collapse))
-      } catch {
-        // Storage may be full or blocked (private mode); the in-memory choice
-        // still applies for this page.
+      if (disposed) return
+      // Any toggle is a user preference from now on: a later configuration
+      // publication must not overwrite it.
+      userTouched = true
+      collapse = toggleCollapse(collapse, id)
+      if (storage !== undefined) {
+        try {
+          storage.setItem(COLLAPSE_STORAGE_KEY, serializeCollapse(collapse))
+        } catch {
+          // Storage may be full or blocked (private mode); the in-memory choice
+          // still applies for this page.
+        }
       }
       recompute()
     },
+    refresh() {
+      if (disposed) return
+      // Republish immediately so the view leaves any stale error/loading posture
+      // even when the refetch itself fails again.
+      recompute()
+      syncConfig()
+    },
     dispose() {
+      if (disposed) return
       disposed = true
       listeners.clear()
       for (const disposer of disposers) disposer()
@@ -247,34 +331,36 @@ export function createBoardStore(options: BoardStoreOptions): BoardStore {
   }
 }
 
-/** Cheap structural comparison so an identical recompute does not re-render. */
+/**
+ * Cheap structural comparison so an identical recompute does not re-render.
+ *
+ * Deliberately thorough: an earlier version short-circuited on the build
+ * timestamp (so two publications in the same millisecond compared equal and the
+ * change was dropped) and compared rows by id/title only (so a row's activity
+ * timestamp — which drives the relative-time text — never triggered a repaint).
+ */
 function sameState(left: BoardState, right: BoardState): boolean {
-  if (left === right) return true
   if (left.status !== right.status || left.locale !== right.locale) return false
   if (left.config !== right.config) return false
   for (const id of BUCKET_IDS) {
     if (left.collapse[id] !== right.collapse[id]) return false
     if (left.board.counts[id] !== right.board.counts[id]) return false
-    if (left.board.buckets[BUCKET_IDS.indexOf(id)]?.truncated !== right.board.buckets[BUCKET_IDS.indexOf(id)]?.truncated) {
-      return false
-    }
   }
-  return left.board.generatedAt === right.board.generatedAt || sameRows(left.board, right.board)
-}
-
-/** Whether two snapshots list the same rows in the same order. */
-function sameRows(left: BoardSnapshot, right: BoardSnapshot): boolean {
-  for (let index = 0; index < left.buckets.length; index += 1) {
-    const leftRows = left.buckets[index]?.entries
-    const rightRows = right.buckets[index]?.entries
-    if (leftRows === undefined || rightRows === undefined || leftRows.length !== rightRows.length) return false
-    for (let row = 0; row < leftRows.length; row += 1) {
-      if (leftRows[row]?.id !== rightRows[row]?.id) return false
-      if (leftRows[row]?.title !== rightRows[row]?.title) return false
+  for (let index = 0; index < left.board.buckets.length; index += 1) {
+    const leftBoard = left.board.buckets[index]
+    const rightBoard = right.board.buckets[index]
+    if (leftBoard === undefined || rightBoard === undefined) return false
+    if (leftBoard.truncated !== rightBoard.truncated) return false
+    if (leftBoard.entries.length !== rightBoard.entries.length) return false
+    for (let row = 0; row < leftBoard.entries.length; row += 1) {
+      const a = leftBoard.entries[row]
+      const b = rightBoard.entries[row]
+      if (a === undefined || b === undefined) return false
+      if (a.id !== b.id) return false
+      if (a.title !== b.title) return false
+      if (a.lastActivityAt !== b.lastActivityAt) return false
+      if (a.workspacePath !== b.workspacePath) return false
     }
   }
   return true
 }
-
-/** Default configuration, re-exported so the view's empty state can read it. */
-export const DEFAULT_CONFIG = CONFIG_DEFAULTS

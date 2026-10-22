@@ -12,7 +12,13 @@ import { STATUS_BOARD_CONFIG_MARKER, STATUS_BOARD_CONFIG_PATH } from '../src/sha
 import type { RouteRequest, RouteResponse, WebRoute } from '../src/index.ts'
 
 /** A response recorder standing in for the web server's response object. */
-function recorder(): { response: RouteResponse; status(): number; headers(): Record<string, string>; body(): unknown } {
+function recorder(): {
+  response: RouteResponse
+  status(): number
+  headers(): Record<string, string>
+  body(): unknown
+  raw(): string
+} {
   let status = 0
   let headers: Record<string, string> = {}
   let body = ''
@@ -31,6 +37,7 @@ function recorder(): { response: RouteResponse; status(): number; headers(): Rec
     status: () => status,
     headers: () => headers,
     body: () => JSON.parse(body === '' ? 'null' : body) as unknown,
+    raw: () => body,
   }
 }
 
@@ -61,10 +68,19 @@ describe('createConfigHandler', () => {
     expect(sink.status()).toBe(200)
   })
 
-  it('refuses every other method without leaking the payload', () => {
+  it('answers HEAD with headers but no body', () => {
+    const sink = call(createConfigHandler(config), { method: 'HEAD' })
+    expect(sink.status()).toBe(200)
+    expect(sink.raw()).toBe('')
+    // The length header still describes the GET representation.
+    expect(Number(sink.headers()['content-length'])).toBeGreaterThan(0)
+  })
+
+  it('refuses every other method without leaking the payload and advertises Allow', () => {
     for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
       const sink = call(createConfigHandler(config), { method })
       expect(sink.status(), method).toBe(405)
+      expect(sink.headers().allow, method).toBe('GET, HEAD')
       expect(sink.body()).toEqual({ marker: STATUS_BOARD_CONFIG_MARKER, error: 'method-not-allowed' })
     }
   })
@@ -180,5 +196,33 @@ describe('apply', () => {
     const { ctx } = fakeContext({ withWebServer: true })
     const bare = { get: ctx.get, effect: ctx.effect }
     expect(() => apply(bare, undefined)).not.toThrow()
+  })
+
+  it('waits for a late-mounting web server through ctx.inject', () => {
+    const routes: WebRoute[] = []
+    const late = {
+      get: () => undefined,
+      effect: (callback: () => unknown) => callback(),
+      inject: (deps: readonly string[], callback: (ctx: never) => unknown) => {
+        // The plugin must ask for the service rather than read it once.
+        expect(deps).toContain('webServer')
+        // Simulate the service arriving later: the callback runs then.
+        callback({
+          get: (name: string) =>
+            name === 'webServer'
+              ? {
+                  register(route: WebRoute) {
+                    routes.push(route)
+                    return () => {}
+                  },
+                }
+              : undefined,
+          effect: (inner: () => unknown) => inner(),
+        } as never)
+      },
+    }
+    apply(late as never, undefined)
+    expect(routes).toHaveLength(1)
+    expect(routes[0]?.path).toBe(STATUS_BOARD_CONFIG_PATH)
   })
 })

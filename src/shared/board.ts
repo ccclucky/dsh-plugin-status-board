@@ -23,6 +23,19 @@ import {
 const HOUR_MS = 3_600_000
 
 /**
+ * Clamp a configured number into an inclusive integer range.
+ *
+ * `buildBoard` is a public function and the Client's config can arrive from an
+ * older Host build, so the bound is enforced here as well as in
+ * `resolveConfig`; a caller that bypasses the resolver must not be able to
+ * request an unbounded window.
+ */
+function clampToRange(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.trunc(value)))
+}
+
+/**
  * Classify one Session.
  *
  * Precedence is intentional and ordered:
@@ -107,8 +120,8 @@ export function buildBoard(
     ;(buckets.get(target) ?? []).push(signal)
   }
 
-  const windowHours = Math.max(1, Math.trunc(config.recentWindowHours))
-  const maxRecent = Math.max(1, Math.trunc(config.maxRecent))
+  const windowHours = clampToRange(config.recentWindowHours, 1, 720, 24)
+  const maxRecent = clampToRange(config.maxRecent, 1, 200, 20)
 
   const decision = [...(buckets.get('decision') ?? [])].sort(compareByRecency).map(toEntry)
   const executing = [...(buckets.get('executing') ?? [])].sort(compareByRecency).map(toEntry)

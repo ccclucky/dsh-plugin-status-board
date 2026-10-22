@@ -6,29 +6,30 @@
  * 1. A **sidebar panel icon** in `sidebar.panellist` — the shipped seat for
  *    global panel icons. A list registration's `id` is what the main column
  *    dispatches on, so the icon and the panel share one id.
- * 2. The **panel body** in `main`, keyed by that same id. The main slot binds
- *    no Session to a non-`conversation` key, which is exactly right: the board
- *    is cross-session by design.
- * 3. The panel's **styles and dictionaries**, both owned by `apply` effects so
- *    unloading the plugin removes them again.
+ * 2. The **panel body** in `main`, keyed by that same id. The main slot binds no
+ *    Session to a non-`conversation` key, which is exactly right: the board is
+ *    cross-session by design.
+ * 3. The **locale dictionaries**, registered through the locale service so the
+ *    Harness language switch and the panel copy move together.
  *
  * Data comes from the Harness's own session list (`ctx.sessions.list`): the
  * framework already publishes it, so this half subscribes instead of polling.
  * Configuration comes from the Host half's read-only route; when that route is
  * unreachable the board renders with the documented defaults.
  *
- * `inject` is a HARD dependency list on purpose. `ctx.sessions` and `ctx.locale`
- * are shipped by the web profile, and declaring them makes Cordis hold
- * activation until both exist — reading them through `ctx.get` at apply time
- * would race the module graph and could permanently bind `undefined`.
+ * `inject` is a HARD dependency list. `ctx.slots`, `ctx.sessions` and
+ * `ctx.locale` are shipped by the web profile, and declaring them makes Cordis
+ * hold activation until all three exist — reading them through `ctx.get` at
+ * apply time would race the module graph and could permanently bind
+ * `undefined`. `uiWorkspace` is deliberately NOT in the list: it is optional,
+ * and its absence only removes the rows' "open" affordance.
  * @module dsh-plugin-status-board/client
  */
 
 import { createElement, type ReactElement } from 'react'
 import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
 import { BoardGlyph, BoardPanel } from './Panel.tsx'
-import type { BoardStore, CollapseStorage } from './store.ts'
-import { createBoardStore, loadPublishedConfig } from './store.ts'
+import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
 import zhFile from '../../locale/zh.json'
@@ -48,21 +49,32 @@ export interface LocaleService {
 
 /** The Harness `sessions` service face, mirrored structurally. */
 export interface SessionsService {
-  list: {
+  readonly list: {
     getSnapshot(): SessionListLike
     subscribe(listener: () => void): () => void
   }
-  open?(id: string): void
+}
+
+/**
+ * The Client navigation service that actually opens a Session.
+ *
+ * `sessions` has no `open` method — the shipped navigation lives on
+ * `uiWorkspace.openSession`, which selects the Session and shows its
+ * Conversation as one action. Optional: without it, rows stay static.
+ */
+export interface WorkspaceNavigationService {
+  openSession(sessionId: string): void
 }
 
 /** The Cordis client context slice this module uses. */
 export interface ClientContext {
-  slots: {
+  readonly slots: {
     register(options: Record<string, unknown>, component: unknown): () => void
     inject(key: string, callback: () => () => void): () => void
   }
-  sessions: SessionsService
-  locale: LocaleService
+  readonly sessions: SessionsService
+  readonly locale: LocaleService
+  get(name: string): unknown
   effect(callback: () => unknown, label?: string): unknown
 }
 
@@ -70,8 +82,8 @@ export interface ClientContext {
  * Read the browser's `localStorage` without assuming it is available.
  *
  * A probe write decides availability: some embeddings expose the object but
- * throw on `setItem` (private mode, blocked third-party storage), and a
- * failure at first toggle would otherwise lose the click.
+ * throw on `setItem` (private mode, blocked third-party storage), and a failure
+ * at first toggle would otherwise lose the click.
  */
 export function browserStorage(): CollapseStorage | undefined {
   try {
@@ -90,9 +102,9 @@ export function browserStorage(): CollapseStorage | undefined {
 
 /**
  * Flatten a nested locale file into the flat dictionary the Harness locale
- * service stores (its `register(ns, locale, dict)` takes `Record<string,
- * string>`; the JSON resources stay nested for readability and for the Plugin
- * Manager's `meta.*` lookup).
+ * service stores (its `register(ns, locale, dict)` takes `Record<string, string>`;
+ * the JSON resources stay nested for readability and for the Plugin Manager's
+ * `meta.*` lookup).
  */
 export function flattenDictionary(value: unknown, prefix = ''): Record<string, string> {
   const out: Record<string, string> = {}
@@ -133,24 +145,34 @@ export function apply(ctx: ClientContext): void {
     sessions: ctx.sessions,
     locale: ctx.locale,
     ...(storage !== undefined ? { storage } : {}),
-    loadConfig: () => loadPublishedConfig(globalThis.fetch.bind(globalThis)),
+    loadConfig: () => loadPublishedConfig(globalThis.fetch),
   })
   ctx.effect(() => () => store.dispose(), 'status-board: store')
 
-  // ── Actions ───────────────────────────────────────────────────────────────
-  /** Open one session in the main column. */
-  function openSession(sessionId: string): void {
-    ctx.sessions.open?.(sessionId)
+  // ── Navigation ────────────────────────────────────────────────────────────
+  // Resolved lazily per click rather than captured at apply time: `uiWorkspace`
+  // may mount after this plugin, and a captured `undefined` would silently
+  // disable the affordance forever.
+  const openSession = (sessionId: string): void => {
+    const navigation = ctx.get('uiWorkspace') as WorkspaceNavigationService | undefined
+    navigation?.openSession?.(sessionId)
   }
+  const canOpenSession = typeof (ctx.get('uiWorkspace') as WorkspaceNavigationService | undefined)?.openSession === 'function'
 
   // ── Slots ─────────────────────────────────────────────────────────────────
-  // The sidebar icon and the main panel share one id; that is how the shell
-  // links a panellist button to the panel it selects. The shell owns the
-  // button chrome and dispatches on the registration's `id`, so the icon
-  // component only draws the glyph — it needs no click handler of its own.
+  // The sidebar icon and the main panel share one id; that is how the shell links
+  // a panellist button to the panel it selects. The shell owns the button chrome
+  // and dispatches on the registration's `id`, so the icon component only draws
+  // the glyph — it needs no click handler of its own.
   const panelLabel = (): string => createTranslate(ctx.locale.getSnapshot().active)('panel.title')
 
-  const PanelComponent = (): ReactElement => createElement(BoardPanel, { store, onOpenSession: openSession })
+  const PanelComponent = (): ReactElement =>
+    createElement(
+      BoardPanel,
+      // Passing `undefined` explicitly (rather than an always-defined handler)
+      // is what lets the panel render static rows when navigation is missing.
+      canOpenSession ? { store, onOpenSession: openSession } : { store },
+    )
   const IconComponent = ({ size }: { size?: number | undefined }): ReactElement =>
     createElement(BoardIcon, { size })
 
@@ -175,9 +197,9 @@ function BoardIcon({ size }: { readonly size?: number | undefined }): ReactEleme
     {
       role: 'presentation',
       'aria-hidden': true,
-      // Inline presentation only: this element renders in the sidebar, where
-      // the panel's local stylesheet is not mounted, and the shell already
-      // supplies the surrounding colour through `currentColor`.
+      // Inline presentation only: this element renders in the sidebar, where the
+      // panel's local stylesheet is not mounted, and the shell already supplies
+      // the surrounding colour through `currentColor`.
       style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
     },
     createElement(BoardGlyph, { size: size ?? 18 }),

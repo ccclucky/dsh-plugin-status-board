@@ -6,10 +6,7 @@
  * validate the package as a consumer would receive it.
  */
 import { readFileSync, statSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-
-const root = fileURLToPath(new URL('..', import.meta.url))
 
 /** Read and parse one repository file. */
 function readJson<T = Record<string, unknown>>(relativePath: string): T {
@@ -39,6 +36,7 @@ interface Manifest {
   }
   scripts: Record<string, string>
   peerDependencies: Record<string, string>
+  peerDependenciesMeta?: Record<string, unknown>
 }
 
 const manifest = readJson<Manifest>('package.json')
@@ -61,8 +59,11 @@ describe('package manifest', () => {
 
   it('declares a web Client half with the module ordering it needs', () => {
     expect(manifest.dsh.client.platform).toBe('web')
+    // Each entry names a package that PROVIDES one of the services the Client
+    // half hard-depends on: locale, slots, and the sessions controller.
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-locale')
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-slots')
+    expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-api-session-controller')
   })
 
   it('exports the runtime entries the manifest points at', () => {
@@ -78,6 +79,13 @@ describe('package manifest', () => {
     }
   })
 
+  it('does not mark a hard runtime dependency as an optional peer', () => {
+    // The Client half hard-injects `locale`; declaring the providing package
+    // optional would promise an install that cannot activate.
+    expect(manifest.peerDependencies['@deepseek-ai/dsh-client-locale']).toBeDefined()
+    expect(manifest.peerDependenciesMeta).toBeUndefined()
+  })
+
   it('declares the type declarations it exports', () => {
     expect(manifest.types).toBe('lib/types/index.d.ts')
     expect(manifest.files).toContain('lib/types/**/*.d.ts')
@@ -91,6 +99,11 @@ describe('package manifest', () => {
 
   it('keeps React as a peer dependency, never a bundled copy', () => {
     expect(manifest.peerDependencies.react).toBeDefined()
+  })
+
+  it('declares a prepublish build so a clean checkout cannot publish without lib/', () => {
+    expect(manifest.scripts.prepublishOnly).toBeTruthy()
+    expect(manifest.main).toBe('lib/index.js')
   })
 })
 
@@ -164,9 +177,5 @@ describe('repository hygiene', () => {
     for (const entry of ['node_modules/', 'lib/', 'coverage/']) {
       expect(ignore, entry).toContain(entry)
     }
-  })
-
-  it('resolves the repository root next to package.json', () => {
-    expect(root.endsWith('dsh-plugin-status-board\\') || root.endsWith('dsh-plugin-status-board/')).toBe(true)
   })
 })

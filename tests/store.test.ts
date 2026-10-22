@@ -2,9 +2,9 @@
  * The Client half's external store.
  *
  * These tests pin the behaviours the view relies on: deriving three boards from
- * a live session list, notifying subscribers only on real change, persisting the
- * user's collapse choices, adopting the Host-published configuration, and
- * releasing every subscription on dispose.
+ * a live session list, reporting the list phase, notifying subscribers only on
+ * real change, persisting collapse choices, adopting the Host configuration
+ * without clobbering a user click, and releasing every subscription on dispose.
  */
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -13,25 +13,28 @@ import {
   loadPublishedConfig,
   parseCollapse,
   serializeCollapse,
+  toStatusBoardConfig,
 } from '../src/client/store.ts'
-import type { CollapseStorage, LocaleFace, BoardStoreOptions } from '../src/client/store.ts'
+import type { BoardStoreOptions, CollapseStorage, LocaleFace } from '../src/client/store.ts'
 import type { SessionListLike, SessionSummaryLike } from '../src/client/session-source.ts'
 import type { ResolvedStatusBoardConfig } from '../src/shared/types.ts'
 
 const NOW = 1_700_000_000_000
 
+/** The documented defaults, spelled out so a default change fails loudly. */
+function defaults(): ResolvedStatusBoardConfig {
+  return { recentWindowHours: 24, maxRecent: 20, defaultCollapsed: 'recent', showEmptyBuckets: true }
+}
+
 /** A session list whose contents the test can publish later. */
 function mutableSessions(initial: SessionSummaryLike[]) {
   const listeners = new Set<() => void>()
-  // The snapshot object is mutable on purpose: the real service publishes a new
-  // value by changing what `getSnapshot()` returns. A `readonly` mirror would
-  // make this double unable to model that.
   let byId: Record<string, SessionSummaryLike> = Object.fromEntries(
     initial.filter(item => item.id !== undefined).map(item => [item.id as string, item]),
   )
   const service = {
     list: {
-      getSnapshot: (): SessionListLike => ({ byId }),
+      getSnapshot: (): SessionListLike => ({ byId, phase: 'ready' as const }),
       subscribe(listener: () => void) {
         listeners.add(listener)
         return () => listeners.delete(listener)
@@ -95,7 +98,7 @@ function build(overrides: Partial<BoardStoreOptions> = {}) {
 
 /** A top-level session row. */
 function row(id: string, overrides: SessionSummaryLike = {}): SessionSummaryLike {
-  return { id, displayTitle: id, running: false, lastActivityAt: NOW, ...overrides }
+  return { id, displayTitle: id, running: false, updatedAt: NOW, ...overrides }
 }
 
 describe('createBoardStore', () => {
@@ -106,15 +109,23 @@ describe('createBoardStore', () => {
     store.dispose()
   })
 
+  it('reports loading while the session list is still pending', () => {
+    const store = createBoardStore({
+      sessions: { list: { getSnapshot: () => ({ byId: {}, phase: 'pending' as const }), subscribe: () => () => {} } },
+      now: () => NOW,
+      loadConfig: () => Promise.resolve(undefined),
+    })
+    expect(store.getSnapshot().status).toBe('loading')
+    store.dispose()
+  })
+
   it('classifies the published sessions into the three boards', () => {
     const sessions = mutableSessions([
-      row('d-await', { awaitingDecision: true }),
       row('e-run', { running: true }),
       row('r-idle'),
     ])
     const { store } = build({ sessions: sessions.service })
-    expect(store.getSnapshot().board.counts).toEqual({ decision: 1, executing: 1, recent: 1 })
-    expect(store.getSnapshot().status).toBe('ready')
+    expect(store.getSnapshot().board.counts).toEqual({ decision: 0, executing: 1, recent: 1 })
     store.dispose()
   })
 
@@ -130,6 +141,18 @@ describe('createBoardStore', () => {
     store.dispose()
   })
 
+  it('re-renders when only a row timestamp moved (relative time must not freeze)', () => {
+    const sessions = mutableSessions([row('r1', { updatedAt: NOW - 60_000 })])
+    const { store } = build({ sessions: sessions.service })
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    sessions.publish([row('r1', { updatedAt: NOW - 10_000 })])
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot().board.buckets[2]?.entries[0]?.lastActivityAt).toBe(NOW - 10_000)
+    store.dispose()
+  })
+
   it('does not notify when a publication changes nothing visible', () => {
     const sessions = mutableSessions([row('r1')])
     const { store } = build({ sessions: sessions.service })
@@ -142,7 +165,8 @@ describe('createBoardStore', () => {
   })
 
   it('starts with the configured default collapse mode', async () => {
-    const { store } = build({ loadConfig: () => Promise.resolve({ ...defaultConfig(), defaultCollapsed: 'all' }) })
+    const { store } = build({ loadConfig: () => Promise.resolve({ ...defaults(), defaultCollapsed: 'all' }) })
+    await Promise.resolve()
     await Promise.resolve()
     expect(store.getSnapshot().collapse).toEqual({ decision: true, executing: true, recent: true })
     store.dispose()
@@ -171,29 +195,44 @@ describe('createBoardStore', () => {
   it('adopts the Host-published configuration without discarding a stored choice', async () => {
     const storage = memoryStorage()
     storage.data.set(COLLAPSE_STORAGE_KEY, serializeCollapse({ decision: false, executing: true, recent: false }))
-    let resolveConfig: ((value: ReturnType<typeof defaultConfig>) => void) | undefined
-    const pending = new Promise<ReturnType<typeof defaultConfig>>(resolve => {
-      resolveConfig = resolve
+    const { store } = build({
+      storage,
+      loadConfig: () => Promise.resolve({ ...defaults(), recentWindowHours: 6, maxRecent: 4, defaultCollapsed: 'all' }),
     })
-    const { store } = build({ storage, loadConfig: () => pending })
-
-    resolveConfig?.({ ...defaultConfig(), recentWindowHours: 6, maxRecent: 4, defaultCollapsed: 'all' })
-    await pending
+    await Promise.resolve()
     await Promise.resolve()
 
     const state = store.getSnapshot()
-    // Config adopted…
     expect(state.config.recentWindowHours).toBe(6)
     expect(state.config.maxRecent).toBe(4)
-    // …but the user's stored collapse choice is NOT overwritten by `all`.
+    // The stored choice survives the late configuration publication.
     expect(state.collapse).toEqual({ decision: false, executing: true, recent: false })
     store.dispose()
   })
 
-  it('applies the published default when the user has not chosen yet', async () => {
-    const { store } = build({
-      loadConfig: () => Promise.resolve({ ...defaultConfig(), defaultCollapsed: 'decision' }),
+  it('does not revert a click made while the configuration was still loading', async () => {
+    let release: ((value: ResolvedStatusBoardConfig) => void) | undefined
+    const pending = new Promise<ResolvedStatusBoardConfig>(resolve => {
+      release = resolve
     })
+    const storage = memoryStorage()
+    const { store } = build({ storage, loadConfig: () => pending })
+
+    // The user clicks before the config arrives.
+    store.toggle('decision')
+    expect(store.getSnapshot().collapse.decision).toBe(true)
+
+    release?.({ ...defaults(), defaultCollapsed: 'none' })
+    await pending
+    await Promise.resolve()
+
+    // Their click must survive; only an untouched board adopts the default.
+    expect(store.getSnapshot().collapse.decision).toBe(true)
+    store.dispose()
+  })
+
+  it('applies the published default when the user has not chosen yet', async () => {
+    const { store } = build({ loadConfig: () => Promise.resolve({ ...defaults(), defaultCollapsed: 'decision' }) })
     await Promise.resolve()
     await Promise.resolve()
     expect(store.getSnapshot().collapse.decision).toBe(true)
@@ -227,9 +266,26 @@ describe('createBoardStore', () => {
     store.dispose()
     expect(sessions.listeners.size).toBe(0)
     expect(locale.listeners.size).toBe(0)
-    // A late publication must not touch a disposed store.
     sessions.publish([row('r2', { running: true })])
     expect(store.getSnapshot().board.counts.executing).toBe(0)
+  })
+
+  it('is inert after dispose: no further subscriptions or toggles', () => {
+    const storage = memoryStorage()
+    const { store } = build({ storage })
+    store.dispose()
+    const listener = vi.fn()
+    const off = store.subscribe(listener)
+    expect(typeof off).toBe('function')
+    store.toggle('decision')
+    expect(listener).not.toHaveBeenCalled()
+    expect(storage.data.has(COLLAPSE_STORAGE_KEY)).toBe(false)
+  })
+
+  it('refreshes without throwing when the Host is unreachable', () => {
+    const { store } = build({ loadConfig: () => Promise.reject(new Error('offline')) })
+    expect(() => store.refresh()).not.toThrow()
+    store.dispose()
   })
 })
 
@@ -248,6 +304,21 @@ describe('parseCollapse', () => {
     expect(parseCollapse('{"decision":true}')).toBeUndefined()
     expect(parseCollapse('{"decision":"yes","executing":false,"recent":true}')).toBeUndefined()
     expect(parseCollapse(null)).toBeUndefined()
+  })
+})
+
+describe('toStatusBoardConfig', () => {
+  it('keeps known fields and drops unknown ones', () => {
+    expect(toStatusBoardConfig({ maxRecent: 5, nonsense: true })).toEqual({ maxRecent: 5 })
+  })
+
+  it('drops values of the wrong type', () => {
+    expect(toStatusBoardConfig({ maxRecent: '5', showEmptyBuckets: 'yes' })).toEqual({})
+  })
+
+  it('returns undefined for a non-object payload', () => {
+    expect(toStatusBoardConfig(null)).toBeUndefined()
+    expect(toStatusBoardConfig('config')).toBeUndefined()
   })
 })
 
@@ -286,6 +357,10 @@ describe('loadPublishedConfig', () => {
     await expect(loadPublishedConfig(badJson)).resolves.toBeUndefined()
   })
 
+  it('returns undefined when the host has no fetch at all', async () => {
+    await expect(loadPublishedConfig(undefined)).resolves.toBeUndefined()
+  })
+
   it('clamps a configuration the Host should not have sent', async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,
@@ -294,13 +369,3 @@ describe('loadPublishedConfig', () => {
     await expect(loadPublishedConfig(fetchImpl)).resolves.toMatchObject({ recentWindowHours: 720 })
   })
 })
-
-/** The resolved defaults, spelled out so a default change fails a test loudly. */
-function defaultConfig(): ResolvedStatusBoardConfig {
-  return {
-    recentWindowHours: 24,
-    maxRecent: 20,
-    defaultCollapsed: 'recent',
-    showEmptyBuckets: true,
-  }
-}

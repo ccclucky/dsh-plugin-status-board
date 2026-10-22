@@ -12,7 +12,7 @@
  * Run: `node scripts/verify-build.mjs`
  */
 import { readFile, stat } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 
@@ -27,7 +27,7 @@ const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
 
 // ── Host half ───────────────────────────────────────────────────────────────
 const hostPath = join(root, 'lib', 'index.js')
-const host = await import(new URL(`file://${hostPath.replaceAll('\\', '/')}`).href)
+const host = await import(pathToFileURL(hostPath).href)
 if (typeof host.apply !== 'function') fail('lib/index.js must export apply(ctx, config)')
 if (host.Config === undefined) fail('lib/index.js must export the Config schema')
 

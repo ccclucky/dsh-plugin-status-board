@@ -30,8 +30,10 @@ const id = manifest.name
 
 const source = await readFile(input, 'utf8')
 
-// A CJS bundle may end with a sourceMappingURL comment; keep it, but make sure
-// the envelope closes on its own line.
+// IMPORTANT: do not re-indent the bundle body. Its string literals (the panel
+// CSS lives in one) must stay byte-identical to what the TypeScript source
+// declared; adding indentation per line would silently rewrite them. The
+// envelope is therefore assembled around the body, never inside it.
 const body = source.trimEnd()
 
 const wrapped = `window.__ModuleLoader__.load({
@@ -39,7 +41,7 @@ const wrapped = `window.__ModuleLoader__.load({
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
-    ${body.split('\n').join('\n    ')}
+${body}
     return module.exports;
   },
 });

@@ -93,31 +93,52 @@ export interface WebServerFace {
 export interface StatusBoardHostContext {
   get(name: string): unknown
   effect(callback: () => unknown, label?: string): unknown
+  /**
+   * Run `callback` once the named service is available, and again for each new
+   * generation of it. Optional: a composition without it registers eagerly.
+   */
+  inject?:
+    | ((deps: readonly string[], callback: (ctx: StatusBoardHostContext) => unknown) => unknown)
+    | undefined
   logger?: { debug?(message: string): void } | undefined
 }
 
 /**
  * Write one JSON response.
+ *
  * @param response - the route response.
  * @param status - HTTP status code.
- * @param body - value serialized with `JSON.stringify`.
+ * @param body - value serialized with `JSON.stringify`; omitted for `HEAD`,
+ *   whose response must carry the headers but no body.
+ * @param extraHeaders - additional response headers (`Allow` on a 405).
  */
-function writeJson(response: RouteResponse, status: number, body: unknown): void {
+function writeJson(
+  response: RouteResponse,
+  status: number,
+  body: unknown,
+  extraHeaders: Record<string, string> = {},
+  omitBody = false,
+): void {
   const payload = JSON.stringify(body)
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': String(Buffer.byteLength(payload)),
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
+    ...extraHeaders,
   })
-  response.end(payload)
+  // HEAD must send the same headers with an empty body (RFC 9110 §9.3.2).
+  response.end(omitBody ? '' : payload)
 }
+
+/** Methods this route answers. */
+const ALLOWED_METHODS = 'GET, HEAD'
 
 /**
  * Build the config route handler.
  *
- * Only `GET` (and its `HEAD`-less variant) is answered; every other method gets
- * `405` without touching the payload. The handler is intentionally pure and
+ * Only `GET` and `HEAD` are answered. Every other method gets `405` with the
+ * `Allow` header RFC 9110 §15.5.6 requires. The handler is pure and
  * synchronous, so it cannot fail on I/O.
  *
  * @param config - the resolved configuration to publish.
@@ -128,10 +149,15 @@ export function createConfigHandler(
   return (request, response) => {
     const method = (request.method ?? 'GET').toUpperCase()
     if (method !== 'GET' && method !== 'HEAD') {
-      writeJson(response, 405, { marker: STATUS_BOARD_CONFIG_MARKER, error: 'method-not-allowed' })
+      writeJson(response, 405, { marker: STATUS_BOARD_CONFIG_MARKER, error: 'method-not-allowed' }, { allow: ALLOWED_METHODS })
       return
     }
-    writeJson(response, 200, { marker: STATUS_BOARD_CONFIG_MARKER, config })
+    const payload = { marker: STATUS_BOARD_CONFIG_MARKER, config }
+    if (method === 'HEAD') {
+      writeJson(response, 200, payload, {}, true)
+      return
+    }
+    writeJson(response, 200, payload)
   }
 }
 
@@ -144,12 +170,12 @@ export function createConfigHandler(
  */
 export function apply(ctx: StatusBoardHostContext, rawConfig?: StatusBoardConfig): void {
   const config = resolveConfig(rawConfig)
-  const webServer = ctx.get('webServer') as WebServerFace | undefined
 
-  // A composition without a web server (a headless CLI run, a unit harness)
-  // simply has no browser to serve: skip the route, keep the row active.
-  if (webServer !== undefined && typeof webServer.register === 'function') {
-    ctx.effect(
+  /** Register the read-only route on whatever web server is current. */
+  const registerRoute = (inner: StatusBoardHostContext): void => {
+    const webServer = inner.get('webServer') as WebServerFace | undefined
+    if (webServer === undefined || typeof webServer.register !== 'function') return
+    inner.effect(
       () =>
         webServer.register({
           kind: 'exact',
@@ -158,6 +184,17 @@ export function apply(ctx: StatusBoardHostContext, rawConfig?: StatusBoardConfig
         }),
       'status-board: config route',
     )
+  }
+
+  // `webServer` can mount after this plugin (the Loader mounts rows in profile
+  // order), so a one-shot `get` at activation would leave the route permanently
+  // unregistered and the Client silently stuck on defaults. `ctx.inject` waits
+  // for the service and re-runs per generation; a composition without it
+  // registers eagerly, which is what the unit tests exercise.
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], registerRoute)
+  } else {
+    registerRoute(ctx)
   }
 
   // One line at activation lets an operator confirm from the log that the

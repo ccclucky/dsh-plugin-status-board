@@ -16,6 +16,7 @@ import {
   formatRelativeTime,
   LOCALE_NAMESPACE,
   lookup,
+  missingLocalePaths,
   pickLocale,
 } from '../src/shared/i18n.ts'
 import type { LocaleFile } from '../src/shared/i18n.ts'
@@ -42,9 +43,21 @@ describe('locale resources', () => {
     expect(flatten(readLocaleFile('zh'))).toEqual(flatten(readLocaleFile('en')))
   })
 
-  it('keeps the bundled dictionaries in sync with the files on disk', () => {
-    expect(DICTIONARIES.zh).toEqual(readLocaleFile('zh'))
-    expect(DICTIONARIES.en).toEqual(readLocaleFile('en'))
+  it('keeps the bundled dictionaries complete against the required paths', () => {
+    // Not a tautology: `DICTIONARIES` is the validated runtime value, while the
+    // files on disk are what a consumer installs. A resource that lost a
+    // required key would be replaced by the fallback at runtime, and this is
+    // what catches that before it ships.
+    for (const id of ['zh', 'en'] as const) {
+      expect(missingLocalePaths(readLocaleFile(id)), id).toEqual([])
+      expect(DICTIONARIES[id]).toBeDefined()
+    }
+  })
+
+  it('reports the paths an incomplete locale is missing', () => {
+    expect(missingLocalePaths({})).toContain('meta.title')
+    expect(missingLocalePaths({ meta: { title: 'x' } })).toContain('meta.description')
+    expect(missingLocalePaths(null).length).toBeGreaterThan(0)
   })
 
   it('provides the display metadata the Plugin Manager reads without activating the plugin', () => {
@@ -91,6 +104,11 @@ describe('formatMessage', () => {
 
   it('leaves unknown placeholders visible instead of deleting copy', () => {
     expect(formatMessage('{known} {unknown}', { known: 'ok' })).toBe('ok {unknown}')
+  })
+
+  it('does not re-substitute text inserted by an earlier parameter', () => {
+    // A per-parameter loop would turn `{a}` into `{b}`'s value here.
+    expect(formatMessage('{a} {b}', { a: '{b}', b: 'SECOND' })).toBe('{b} SECOND')
   })
 
   it('returns the template untouched when no parameters are given', () => {

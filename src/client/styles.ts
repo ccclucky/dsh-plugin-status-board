@@ -4,11 +4,11 @@
  * Colour comes exclusively from the Harness theme tokens (`--dsw-alias-*`), so
  * the panel follows light/dark switching and survives a token rename with a
  * degraded-but-readable appearance. Sizes follow the Harness chrome rather than
- * inventing a scale: 13px rows, 12px meta, 8px dot, 6px radius.
+ * inventing a scale: 13px rows, 11px meta, 8px dot, 10px card radius.
  *
- * The CSS is a string rather than an imported stylesheet on purpose: a
- * plugin-owned `<style>` element unmounts with the component, so no global
- * stylesheet can outlive the panel (see the Client plugin guidance).
+ * The CSS is a string rendered inside the panel on purpose: the `<style>`
+ * element unmounts with the component, so no global stylesheet can outlive the
+ * plugin (the Harness exposes no `ctx.styles` service to a static bundle).
  * @module dsh-plugin-status-board/client/styles
  */
 
@@ -37,7 +37,7 @@ export const PANEL_CSS = String.raw`
   gap: 8px 16px;
 }
 
-.status-board__heading {
+.status-board__heading-group {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -64,12 +64,31 @@ export const PANEL_CSS = String.raw`
 }
 
 .status-board__alert {
-  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
   padding: 8px 12px;
   border: 1px solid var(--dsw-alias-state-error-primary);
   border-radius: 8px;
   color: var(--dsw-alias-state-error-primary);
   font-size: 12px;
+}
+
+.status-board__retry {
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.status-board__retry:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
 }
 
 .status-board__grid {
@@ -96,6 +115,14 @@ export const PANEL_CSS = String.raw`
 
 .status-board__card[data-bucket="recent"] {
   border-left: 3px solid var(--dsw-alias-state-idle-primary);
+}
+
+/* The heading wraps the disclosure button (WAI-ARIA accordion pattern); it must
+   contribute no heading chrome of its own. */
+.status-board__heading {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .status-board__toggle {
@@ -180,6 +207,11 @@ export const PANEL_CSS = String.raw`
   color: inherit;
   font: inherit;
   text-align: left;
+}
+
+/* Only an actual button advertises itself as clickable; a static list row
+   must not claim an affordance it does not have. */
+button.status-board__row {
   cursor: pointer;
 }
 

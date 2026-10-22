@@ -34,11 +34,14 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
-
+      # Build BEFORE the test step: `tests/artifacts.test.ts` asserts the built
+      # artefacts and skips itself when `lib/` is absent. Running tests first
+      # would let those nine contract checks pass silently by never running.
       - name: Build (includes the loader-envelope smoke check)
         run: pnpm build
+
+      - name: Test
+        run: pnpm test
 
       - name: Verify packed file list
         run: npm pack --dry-run
