@@ -5,6 +5,8 @@
 **A DSH plugin that sorts your sessions into three collapsible boards — so you can see at a glance where every session actually stands.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/dsh-plugin-status-board.svg)](https://www.npmjs.com/package/dsh-plugin-status-board)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-plugin-status-board.svg)](https://www.npmjs.com/package/dsh-plugin-status-board)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6.svg)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A520-339933.svg)](https://nodejs.org/)
 [![DSH Plugin](https://img.shields.io/badge/DSH-Plugin-247bbf.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -54,14 +56,23 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
 3. Reload the page. A board icon appears in the sidebar footer; click it to open the panel.
 
-### Option 2 — CLI
+### Option 2 — CLI, from npm (recommended for scripted setups)
+
+The package is published to npm; the built `lib/` output ships with it, so no clone or build is needed:
 
 ```bash
-# From a local directory (it must already contain the lib/ build output)
+npm install -g dsh-plugin-status-board        # or: npm i dsh-plugin-status-board
+dsh plugin --profile <profile> add dsh-plugin-status-board
+```
+
+### Option 3 — From a local directory
+
+```bash
+# the directory must already contain the lib/ build output
 dsh plugin --profile <profile> add /absolute/path/to/dsh-plugin-status-board
 ```
 
-### From source (required before a Git install)
+### Option 4 — From source (required before a Git install)
 
 `lib/` is build output and is not tracked. After cloning, build first, then install:
 

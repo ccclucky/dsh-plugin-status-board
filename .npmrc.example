@@ -1,0 +1,9 @@
+# Example `.npmrc` for publishing this package.
+#
+# Copy to `.npmrc` (which is git-ignored) and fill in a real token, or export
+# the token as `NPM_TOKEN` in CI. Never commit the filled-in file.
+#
+# The token needs the "Read and write" scope for the `dsh-plugin-status-board`
+# package (or the account's default publish scope).
+//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+access=public

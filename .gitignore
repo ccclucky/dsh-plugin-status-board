@@ -16,6 +16,11 @@ coverage/
 .env.*
 !.env.example
 
+# npm credentials: a publish token lives here and must never be committed.
+# `.npmrc.example` documents the expected shape without a secret.
+.npmrc
+.npmrc.local
+
 # Editor / OS noise
 .DS_Store
 Thumbs.db

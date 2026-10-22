@@ -5,6 +5,8 @@
 **DSH 会话状态分类看板插件 — 一屏看清每个会话到底卡在哪一步。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/dsh-plugin-status-board.svg)](https://www.npmjs.com/package/dsh-plugin-status-board)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-plugin-status-board.svg)](https://www.npmjs.com/package/dsh-plugin-status-board)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6.svg)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A520-339933.svg)](https://nodejs.org/)
 [![DSH Plugin](https://img.shields.io/badge/DSH-Plugin-247bbf.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -54,14 +56,23 @@
 2. 选择 **Install bundle**，填入本包的**绝对路径**（本地目录安装）或包名（已发布到 npm 时）。
 3. 安装完成后刷新页面，侧栏底部会出现看板图标，点击即可打开面板。
 
-### 方式二：命令行
+### 方式二：命令行（从 npm 安装，推荐脚本化场景）
+
+包已发布到 npm，无需克隆或构建，`lib/` 产物随包分发：
 
 ```bash
-# 从本地目录安装（目录中必须已有 lib/ 产物）
+npm install -g dsh-plugin-status-board        # 或 npm i dsh-plugin-status-board
+dsh plugin --profile <profile> add dsh-plugin-status-board
+```
+
+### 方式三：从本地目录安装
+
+```bash
+# 目录中必须已有 lib/ 产物（npm 安装的副本已自带）
 dsh plugin --profile <profile> add /absolute/path/to/dsh-plugin-status-board
 ```
 
-### 从源码构建（Git 安装必须先构建）
+### 方式四：从源码构建（Git 安装必须先构建）
 
 `lib/` 是构建产物，不进入版本库。从 Git 克隆后请先构建，再安装：
 
