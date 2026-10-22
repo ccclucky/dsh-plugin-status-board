@@ -150,14 +150,14 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => () => store.dispose(), 'status-board: store')
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  // Resolved lazily per click rather than captured at apply time: `uiWorkspace`
-  // may mount after this plugin, and a captured `undefined` would silently
-  // disable the affordance forever.
-  const openSession = (sessionId: string): void => {
+  // Resolved per render (not captured here): `uiWorkspace` may mount after this
+  // plugin, and a boolean computed at apply time would permanently render rows
+  // as static text on such a composition.
+  const resolveNavigation = (): ((sessionId: string) => void) | undefined => {
     const navigation = ctx.get('uiWorkspace') as WorkspaceNavigationService | undefined
-    navigation?.openSession?.(sessionId)
+    if (typeof navigation?.openSession !== 'function') return undefined
+    return (sessionId: string) => navigation.openSession(sessionId)
   }
-  const canOpenSession = typeof (ctx.get('uiWorkspace') as WorkspaceNavigationService | undefined)?.openSession === 'function'
 
   // ── Slots ─────────────────────────────────────────────────────────────────
   // The sidebar icon and the main panel share one id; that is how the shell links
@@ -166,13 +166,7 @@ export function apply(ctx: ClientContext): void {
   // the glyph — it needs no click handler of its own.
   const panelLabel = (): string => createTranslate(ctx.locale.getSnapshot().active)('panel.title')
 
-  const PanelComponent = (): ReactElement =>
-    createElement(
-      BoardPanel,
-      // Passing `undefined` explicitly (rather than an always-defined handler)
-      // is what lets the panel render static rows when navigation is missing.
-      canOpenSession ? { store, onOpenSession: openSession } : { store },
-    )
+  const PanelComponent = (): ReactElement => createElement(BoardPanel, { store, resolveNavigation })
   const IconComponent = ({ size }: { size?: number | undefined }): ReactElement =>
     createElement(BoardIcon, { size })
 

@@ -2,17 +2,25 @@
  * Panel rendering contract.
  *
  * Rendered with `react-dom/server` so the assertions are about the DOM the
- * Harness will actually receive: the three boards, the disclosure semantics, the
- * accessible names, and the guarantee that a panel cannot render a blank region
- * by accident.
+ * Harness will actually receive. The interaction tests use a real jsdom document
+ * (this file opts into that environment) because a click path exercised through
+ * a prop is not evidence that the wiring works.
+ *
+ * @vitest-environment jsdom
  */
 import { describe, expect, it, vi } from 'vitest'
-import { createElement } from 'react'
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { BoardPanel, BoardGlyph } from '../src/client/Panel.tsx'
+import { BoardPanel, BoardGlyph, Row } from '../src/client/Panel.tsx'
 import { createBoardStore } from '../src/client/store.ts'
+import { createTranslate } from '../src/shared/i18n.ts'
 import type { SessionListLike } from '../src/client/session-source.ts'
 import type { ResolvedStatusBoardConfig } from '../src/shared/types.ts'
+
+// React only treats `act()` as supported when this global is set; without it the
+// interaction tests below warn on every dispatch and may batch differently.
+;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const NOW = 1_700_000_000_000
 
@@ -52,14 +60,19 @@ async function storeFor(
   return store
 }
 
-/** Render the panel to static markup, optionally wiring the open action. */
+/** Render the panel to static markup, optionally wiring the navigation seam. */
 async function render(
   rows: Record<string, unknown>[],
-  options: { config?: ResolvedStatusBoardConfig; onOpenSession?: (id: string) => void; phase?: 'pending' | 'ready' } = {},
+  options: {
+    config?: ResolvedStatusBoardConfig
+    onOpenSession?: (id: string) => void
+    phase?: 'pending' | 'ready'
+  } = {},
 ): Promise<string> {
   const store = await storeFor(rows, options.config ?? DEFAULTS, options.phase ?? 'ready')
-  const props =
-    options.onOpenSession === undefined ? { store } : { store, onOpenSession: options.onOpenSession }
+  const seam =
+    options.onOpenSession === undefined ? undefined : () => options.onOpenSession
+  const props = seam === undefined ? { store } : { store, resolveNavigation: seam }
   const markup = renderToStaticMarkup(createElement(BoardPanel, props))
   store.dispose()
   return markup
@@ -163,39 +176,137 @@ describe('BoardPanel', () => {
     expect(markup).toContain('No sessions')
   })
 
-  it('reports loading distinctly from empty', async () => {
+  it('reports loading distinctly from empty, and never shows both', async () => {
     const markup = await render([], { phase: 'pending' })
     expect(markup).toContain('Reading sessions')
     expect(markup).not.toContain('No sessions to show yet')
+    // The per-board empty state must not contradict the panel-level loading
+    // line: "no sessions" is not a fact until enumeration has settled.
+    expect(markup).not.toContain('>No sessions<')
   })
 
   it('renders rows as buttons only when opening a session is wired', async () => {
     const rows = [row('e', 'Act on me', { running: true })]
     const withAction = await render(rows, { onOpenSession: () => {} })
-    expect(withAction).toContain('Open session: Act on me')
+    expect(withAction).toContain('aria-label="Act on me"')
 
     const withoutAction = await render(rows)
-    expect(withoutAction).not.toContain('Open session:')
+    expect(withoutAction).not.toContain('aria-label="Act on me"')
     // Only the three board toggles remain as buttons.
     expect(withoutAction.match(/<button/g)?.length).toBe(3)
   })
 
-  it('invokes the open action with the session id', async () => {
+  it('wires the row click to the navigation seam with the session id', () => {
+    // Render the ROW itself into a real DOM and click the button: an earlier
+    // version of this test called the prop directly, which proved nothing about
+    // the wiring it claimed to cover.
+    const container = document.createElement('div')
+    document.body.append(container)
     const onOpen = vi.fn()
-    const store = await storeFor([row('e', 'Act on me', { running: true })])
-    const element = createElement(BoardPanel, { store, onOpenSession: onOpen }) as unknown as {
-      props: { onOpenSession: (id: string) => void }
-    }
-    // Drive the prop exactly as the shell's row button does.
-    element.props.onOpenSession('e')
-    store.dispose()
+    const root = createRoot(container)
+    act(() => {
+      root.render(
+        createElement(
+          'ul',
+          null,
+          createElement(Row, {
+            entry: { id: 'e', title: 'Act on me', lastActivityAt: NOW },
+            bucket: 'executing' as const,
+            translate: createTranslate('en'),
+            now: NOW,
+            onOpen,
+          }),
+        ),
+      )
+    })
+    const button = container.querySelector('button')
+    expect(button).not.toBeNull()
+    act(() => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    act(() => root.unmount())
+    container.remove()
     expect(onOpen).toHaveBeenCalledWith('e')
+  })
+
+  it('describes the row button with its relative time instead of hiding it', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    act(() => {
+      root.render(
+        createElement(
+          'ul',
+          null,
+          createElement(Row, {
+            entry: { id: 'e', title: 'Act on me', lastActivityAt: NOW - 3 * 60_000 },
+            bucket: 'executing' as const,
+            translate: createTranslate('en'),
+            now: NOW,
+            onOpen: () => {},
+          }),
+        ),
+      )
+    })
+    const button = container.querySelector('button')
+    const describedBy = button?.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    // The IDREF must resolve, and the element it names must carry the time.
+    const described = container.querySelector(`#${String(describedBy)}`)
+    expect(described?.textContent).toBe('3 min ago')
+    expect(button?.getAttribute('aria-label')).toBe('Act on me')
+    act(() => root.unmount())
+    container.remove()
+  })
+
+  it('describes the row button with its relative time instead of hiding it', () => {
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    act(() => {
+      root.render(
+        createElement(
+          'ul',
+          null,
+          createElement(Row, {
+            entry: { id: 'e', title: 'Act on me', lastActivityAt: NOW - 3 * 60_000 },
+            bucket: 'executing' as const,
+            translate: createTranslate('en'),
+            now: NOW,
+            onOpen: () => {},
+          }),
+        ),
+      )
+    })
+    const button = container.querySelector('button')
+    const describedBy = button?.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    // The IDREF must resolve, and the element it names must carry the time.
+    const described = container.querySelector(`#${String(describedBy)}`)
+    expect(described?.textContent).toBe('3 min ago')
+    expect(button?.getAttribute('aria-label')).toBe('Act on me')
+    act(() => root.unmount())
+  })
+
+  it('takes the navigation seam as a function so a late uiWorkspace still enables rows', async () => {
+    let available = false
+    const onOpen = vi.fn()
+    const props = { store: await storeFor([row('e', 'Later', { running: true })]), resolveNavigation: () => (available ? onOpen : undefined) }
+
+    // Before the service mounts: static text, no fake affordance.
+    const before = renderToStaticMarkup(createElement(BoardPanel, props))
+    expect(before).not.toContain('aria-label="Later"')
+
+    // After it mounts: the very next render exposes the button.
+    available = true
+    const after = renderToStaticMarkup(createElement(BoardPanel, props))
+    expect(after).toContain('aria-label="Later"')
+    props.store.dispose()
   })
 
   it('labels the toggle with the board, the action and the count', async () => {
     const markup = await render([row('e', 'x', { running: true })])
     expect(markup).toContain('Collapse')
-    expect(markup).toContain('1 sessions')
+    expect(markup).toContain('“Running”: 1 sessions')
   })
 
   it('embeds the panel stylesheet so the panel is self-contained', async () => {
@@ -214,21 +325,24 @@ describe('BoardPanel', () => {
     expect(styleBlock).toContain('var(--dsw-alias-')
   })
 
-  it('announces the panel as a labelled region', async () => {
+  it('announces exactly one landmark for the panel, with groups inside', async () => {
     const markup = await render([])
-    expect(markup).toContain('role="region"')
+    expect(markup.match(/role="region"/g)).toHaveLength(1)
     expect(markup).toContain('aria-labelledby="status-board-title-')
+    // Nested boards are groups, not regions, so a screen reader does not hear
+    // four landmarks of which three repeat a board name.
+    expect(markup.match(/role="group"/g)).toHaveLength(3)
   })
 
   it('renders a total-session summary', async () => {
     const markup = await render([row('e1', 'a', { running: true }), row('e2', 'b', { running: true })])
-    expect(markup).toContain('2 sessions')
+    expect(markup).toContain('Sessions: 2')
   })
 
   it('reports how many recent rows the cap hid', async () => {
     const rows = Array.from({ length: 5 }, (_, index) => row(`r${index}`, `Row ${index}`))
     const markup = await render(rows, { config: { ...DEFAULTS, maxRecent: 2, defaultCollapsed: 'none' } })
-    expect(markup).toContain('3 older sessions are hidden')
+    expect(markup).toContain('Hidden older sessions: 3')
   })
 
   it('hides an empty board when the operator turned headers off', async () => {
@@ -240,7 +354,7 @@ describe('BoardPanel', () => {
     expect(cards(withoutHeaders)).toBe(0)
   })
 
-  it('offers a retry control in the error state', async () => {
+  it('reports a missing session list as an alert without a dead retry control', async () => {
     const store = createBoardStore({
       // No session list at all: the profile does not expose the service.
       sessions: {},
@@ -251,7 +365,8 @@ describe('BoardPanel', () => {
     const markup = renderToStaticMarkup(createElement(BoardPanel, { store }))
     store.dispose()
     expect(markup).toContain('role="alert"')
-    expect(markup).toContain('Retry')
+    // Nothing the user can do from the panel fixes this, so no retry button.
+    expect(markup).not.toContain('Retry')
   })
 
   it('renders Chinese copy when the locale service reports zh', async () => {

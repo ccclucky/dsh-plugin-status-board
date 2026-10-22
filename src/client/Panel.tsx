@@ -30,8 +30,15 @@ import { PANEL_CSS } from './styles.ts'
 export interface PanelProps {
   /** The store this panel renders; created by the Client half's `apply`. */
   readonly store: BoardStore
-  /** Open one session in the main column; absent when navigation is unavailable. */
-  readonly onOpenSession?: ((sessionId: string) => void) | undefined
+  /**
+   * Resolve the navigation seam, or `undefined` when this composition has none.
+   *
+   * A function rather than a captured handler: `uiWorkspace` may mount after
+   * this plugin, so the render (not `apply`) has to be the moment the
+   * affordance is decided. A click-time-only lookup would leave rows rendered
+   * as static text forever on such a composition.
+   */
+  readonly resolveNavigation?: (() => ((sessionId: string) => void) | undefined) | undefined
 }
 
 /** How often relative timestamps are refreshed while nothing else changes. */
@@ -93,8 +100,8 @@ export function BoardGlyph({ size = 16 }: { readonly size?: number }): ReactElem
   )
 }
 
-/** One row. */
-function Row({
+/** One row. Exported for the view tests, which exercise the real click path. */
+export function Row({
   entry,
   bucket,
   translate,
@@ -111,12 +118,13 @@ function Row({
   // The workspace path is useful but would cost a third column; the native
   // tooltip carries it without competing for the row's width.
   const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
+  const metaId = `status-board-meta-${entry.id}`
   const content = [
     <span className="status-board__dot" aria-hidden="true" key="dot" />,
     <span className="status-board__row-title" key="title">
       {entry.title}
     </span>,
-    <span className="status-board__row-meta" key="meta">
+    <span className="status-board__row-meta" id={metaId} key="meta">
       {meta}
     </span>,
   ]
@@ -137,7 +145,11 @@ function Row({
         className="status-board__row"
         data-state={bucket}
         title={tooltip}
-        aria-label={`${translate('action.open')}: ${entry.title}`}
+        // The visible title is the accessible name; the relative time rides
+        // along as the description so a screen-reader user hears when the
+        // session last moved.
+        aria-label={entry.title}
+        aria-describedby={metaId}
         onClick={() => onOpen(entry.id)}
       >
         {content}
@@ -180,6 +192,11 @@ function Bucket({
   // still renders otherwise so the three-column rhythm stays stable.
   if (count === 0 && !state.config.showEmptyBuckets) return null
 
+  // While the list is still being enumerated, "no sessions" is not a fact yet.
+  // Rendering it beside the panel's "Reading sessions…" line would tell the user
+  // two contradictory things at once.
+  const loading = state.status === 'loading' && count === 0
+
   return (
     <section className="status-board__card" data-bucket={id} aria-labelledby={headingId}>
       <h2 className="status-board__heading" id={headingId}>
@@ -200,9 +217,11 @@ function Bucket({
       </h2>
       <p className="status-board__hint">{hint}</p>
       {/* Mounted even while collapsed so `aria-controls` always resolves to a
-          real element (ARIA requires IDREFs to resolve). */}
-      <div id={regionId} role="region" aria-label={name} hidden={collapsed}>
-        {count === 0 ? (
+          real element (ARIA requires IDREFs to resolve). `role="group"`, not
+          `role="region"`: the card is already a landmark, and a nested region
+          with the same name would be announced twice. */}
+      <div id={regionId} role="group" aria-label={name} hidden={collapsed}>
+        {loading ? null : count === 0 ? (
           <p className="status-board__empty">{translate('bucket.empty')}</p>
         ) : (
           <ul className="status-board__rows">
@@ -231,7 +250,11 @@ function Bucket({
  *
  * @param props - the store plus the navigation seam.
  */
-export function BoardPanel({ store, onOpenSession }: PanelProps): ReactElement {
+export function BoardPanel({ store, resolveNavigation }: PanelProps): ReactElement {
+  // Resolved during render, not at `apply` time: `uiWorkspace` may mount after
+  // this plugin, and a value captured once would permanently lock the rows into
+  // their non-interactive form.
+  const onOpenSession = resolveNavigation?.()
   return <BoardPanelBody store={store} onOpenSession={onOpenSession} />
 }
 
@@ -264,13 +287,14 @@ function BoardPanelBody({
         <span className="status-board__total">{translate('summary.total', { total })}</span>
       </div>
 
+      {/* Not retryable: the only condition that reaches this state is a
+          composition with no session list at all, which the user cannot change
+          from here. Offering a retry button would be a dead end dressed up as
+          an action. */}
       {state.status === 'error' ? (
-        <div className="status-board__alert" role="alert">
-          <span>{translate('state.error')}</span>
-          <button type="button" className="status-board__retry" onClick={() => store.refresh()}>
-            {translate('state.retry')}
-          </button>
-        </div>
+        <p className="status-board__alert" role="alert">
+          {translate('state.error')}
+        </p>
       ) : null}
 
       <div className="status-board__grid">

@@ -21,14 +21,14 @@
 
 | 看板 | 判定规则 | 它回答的问题 |
 | :--- | :--- | :--- |
-| **待我决策** | 会话正在等待用户拍板（审批、提问，或 Lead 会话里有「已就绪且待认领」的团队任务） | 「我现在必须处理什么？」 |
+| **待我决策** | 会话正在等你回话：工具用 `ask_user_question` 停在那里等你回答（含计划审阅），或 Lead 会话里有「已就绪且待认领」的团队任务 | 「我现在必须处理什么？」 |
 | **正在执行** | 会话的 Agent 正在干活，且不需要用户介入 | 「后台在跑什么？」 |
 | **近期记录** | 其余会话中，在时间窗口内有活动的 | 「最近动过什么？」 |
 
 判定顺序是**排他的**：一个会话只会出现在一块看板里。这也正是它相对原生侧栏列表的价值——原生列表按工作区/时间排列，看不出「谁在等我」；看板按**行动优先级**排列。
 
 > **演示占位**
-> 截图/GIF 待补充：`docs/demo-light.png`（浅色主题）、`docs/demo-dark.png`（深色主题）、`docs/demo-collapse.gif`（折叠交互）。
+> 截图/GIF 待补充：`docs/demo/demo-light.png`（浅色主题）、`docs/demo/demo-dark.png`（深色主题）、`docs/demo/demo-collapse.gif`（折叠交互）。
 > 三块看板在宽屏下为多列网格，窄屏（≤720px）自动堆叠为单列。
 
 ---
@@ -144,8 +144,9 @@ lib/
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit，strict + exactOptionalPropertyTypes
-pnpm test        # vitest，166 个用例
-pnpm build       # 清理 → 声明文件 → 两半部打包 → Client 信封包装
+pnpm test        # vitest，168 个用例
+pnpm build       # 清理 → 声明文件 → 两半部打包 → Client 信封包装 → 产物自检
+pnpm verify      # 只跑构建产物自检（需先 build）
 pnpm test:watch  # 监听模式
 ```
 
@@ -168,7 +169,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # 运行时快照 → 分类输入的唯一适配点
 │       └── styles.ts            # 主题令牌驱动的样式
 ├── locale/{zh,en}.json          # 界面文案 + 插件管理页元数据
-├── tests/                       # 166 个单元测试
+├── tests/                       # 168 个单元测试
 ├── scripts/                     # 清理与 Client 信封包装
 ├── cordis.patch.yml             # bundle 补丁（含默认配置）
 └── tsdown.config.ts             # 两半部独立构建

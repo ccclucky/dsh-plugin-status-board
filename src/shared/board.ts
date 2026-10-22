@@ -112,20 +112,19 @@ export function buildBoard(
   config: Pick<ResolvedStatusBoardConfig, 'recentWindowHours' | 'maxRecent'>,
   now: number = Date.now(),
 ): BoardSnapshot {
-  const buckets = new Map<BucketId, SessionSignal[]>(BUCKET_IDS.map(id => [id, []]))
+  // A total, pre-seeded record: a Map lookup that missed would silently drop a
+  // session from every board, which is worse than the type noise a `!` avoids.
+  const buckets: Record<BucketId, SessionSignal[]> = { decision: [], executing: [], recent: [] }
   for (const signal of signals) {
-    const target = classifySession(signal)
-    // The `?? []` cannot trigger (the map is pre-seeded) but keeps the lookup
-    // total under `noUncheckedIndexedAccess`.
-    ;(buckets.get(target) ?? []).push(signal)
+    buckets[classifySession(signal)].push(signal)
   }
 
   const windowHours = clampToRange(config.recentWindowHours, 1, 720, 24)
   const maxRecent = clampToRange(config.maxRecent, 1, 200, 20)
 
-  const decision = [...(buckets.get('decision') ?? [])].sort(compareByRecency).map(toEntry)
-  const executing = [...(buckets.get('executing') ?? [])].sort(compareByRecency).map(toEntry)
-  const recentAll = [...(buckets.get('recent') ?? [])]
+  const decision = [...buckets.decision].sort(compareByRecency).map(toEntry)
+  const executing = [...buckets.executing].sort(compareByRecency).map(toEntry)
+  const recentAll = [...buckets.recent]
     .filter(signal => isWithinWindow(signal, now, windowHours))
     .sort(compareByRecency)
     .map(toEntry)

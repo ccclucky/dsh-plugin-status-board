@@ -30,16 +30,25 @@ export interface SessionSignal {
   /** Whether the Session's Agent is currently working. */
   readonly running: boolean
   /**
-   * Whether the Session is blocked on a decision only the user can make
-   * (a pending approval, a pending question, or a team task waiting for its
-   * owner). Such a Session outranks `running`: work cannot continue until the
-   * user acts.
+   * Whether the Session is blocked on a decision only the user can make.
+   *
+   * Derived from the Session's own projections — a parked `userQuestions` entry
+   * (the `ask_user_question` tool waiting for a human answer, plan review
+   * included) or a ready, unclaimed team task. Such a Session outranks
+   * `running`: work cannot continue until the user acts.
+   *
+   * Note what is deliberately NOT here: a pending *approval* is rendered by the
+   * Conversation's own approval UI and is not published as a session-list
+   * projection, so no field of this shape can see it.
    */
   readonly awaitingDecision: boolean
   /**
    * Epoch milliseconds of the Session's newest observed activity. `0` means
    * "not known", which keeps a Session visible instead of silently dropping
    * it.
+   *
+   * Fed by `updatedAt`, the only timestamp the Harness session summary
+   * publishes today.
    */
   readonly lastActivityAt: number
 }

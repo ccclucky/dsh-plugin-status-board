@@ -60,10 +60,13 @@ describe('package manifest', () => {
   it('declares a web Client half with the module ordering it needs', () => {
     expect(manifest.dsh.client.platform).toBe('web')
     // Each entry names a package that PROVIDES one of the services the Client
-    // half hard-depends on: locale, slots, and the sessions controller.
+    // half hard-depends on. `slots` is provided by ui-renderer (there is no
+    // standalone ui-slots package to install); sessions come from the session
+    // controller; locale from the locale package.
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-locale')
-    expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-slots')
+    expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-client-ui-renderer')
     expect(manifest.dsh.client.inject).toContain('@deepseek-ai/dsh-api-session-controller')
+    expect(manifest.dsh.client.inject).not.toContain('@deepseek-ai/dsh-client-ui-slots')
   })
 
   it('exports the runtime entries the manifest points at', () => {

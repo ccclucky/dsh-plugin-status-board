@@ -281,12 +281,6 @@ describe('createBoardStore', () => {
     expect(listener).not.toHaveBeenCalled()
     expect(storage.data.has(COLLAPSE_STORAGE_KEY)).toBe(false)
   })
-
-  it('refreshes without throwing when the Host is unreachable', () => {
-    const { store } = build({ loadConfig: () => Promise.reject(new Error('offline')) })
-    expect(() => store.refresh()).not.toThrow()
-    store.dispose()
-  })
 })
 
 describe('parseCollapse', () => {

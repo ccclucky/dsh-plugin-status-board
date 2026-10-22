@@ -21,7 +21,7 @@
 
 | Board | Rule | The question it answers |
 | :--- | :--- | :--- |
-| **Needs my decision** | The session is blocked on you — a pending approval, a pending question, or a Lead session holding a ready-and-unclaimed team task | “What must I handle now?” |
+| **Needs my decision** | The session is waiting on your reply: a tool parked on `ask_user_question` (plan review included), or a Lead session holding a ready-and-unclaimed team task | “What must I handle now?” |
 | **Running** | The agent is working and needs nothing from you | “What is running in the background?” |
 | **Recent records** | Everything else that saw activity inside the time window | “What moved recently?” |
 
@@ -144,8 +144,9 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 166 cases
-pnpm build       # clean → declarations → both halves → Client envelope wrap
+pnpm test        # vitest, 168 cases
+pnpm build       # clean → declarations → both halves → Client envelope wrap → self-check
+pnpm verify      # artefact self-check only (run pnpm build first)
 pnpm test:watch  # watch mode
 ```
 
@@ -168,7 +169,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # the single runtime-snapshot adapter
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 166 unit tests
+├── tests/                       # 168 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.ts             # two independent builds

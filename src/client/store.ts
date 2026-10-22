@@ -16,11 +16,11 @@
  */
 
 import { buildBoard, resolveCollapse, toggleCollapse } from '../shared/board.ts'
-import { resolveConfig } from '../shared/config.ts'
+import { isCollapseMode, resolveConfig } from '../shared/config.ts'
 import { STATUS_BOARD_CONFIG_MARKER, STATUS_BOARD_CONFIG_PATH } from '../shared/route.ts'
 import { pickLocale, type LocaleId } from '../shared/i18n.ts'
 import { BUCKET_IDS, type BoardSnapshot, type BucketId, type CollapseState, type ResolvedStatusBoardConfig, type StatusBoardConfig } from '../shared/types.ts'
-import { collectSessionSignals, type SessionsFace } from './session-source.ts'
+import { collectSessionSignals, type SessionsFace, type SessionListLike } from './session-source.ts'
 
 /** The minimal storage face the store needs (browser `localStorage` subset). */
 export interface CollapseStorage {
@@ -60,14 +60,6 @@ export interface BoardStore {
   subscribe(listener: () => void): () => void
   /** Flip one board, persisting the choice. */
   toggle(id: BucketId): void
-  /**
-   * Re-read the Host configuration and republish the derived state.
-   *
-   * The view exposes this behind the error state's retry control and its
-   * refresh action: a transient failure to reach the Host half must be
-   * recoverable without reloading the page (Nielsen: help users recover).
-   */
-  refresh(): void
   /** Stop every subscription (plugin unload / HMR). */
   dispose(): void
 }
@@ -142,9 +134,10 @@ export function toStatusBoardConfig(value: unknown): StatusBoardConfig | undefin
   } = {}
   if (typeof record.recentWindowHours === 'number') config.recentWindowHours = record.recentWindowHours
   if (typeof record.maxRecent === 'number') config.maxRecent = record.maxRecent
-  if (typeof record.defaultCollapsed === 'string') {
-    config.defaultCollapsed = record.defaultCollapsed as StatusBoardConfig['defaultCollapsed']
-  }
+  // Validate the enum here instead of casting: an unknown string would
+  // otherwise be pushed into `resolveConfig` and silently replaced there,
+  // which hides the disagreement between Host and Client versions.
+  if (isCollapseMode(record.defaultCollapsed)) config.defaultCollapsed = record.defaultCollapsed
   if (typeof record.showEmptyBuckets === 'boolean') config.showEmptyBuckets = record.showEmptyBuckets
   return config
 }
@@ -240,7 +233,7 @@ export function createBoardStore(options: BoardStoreOptions): BoardStore {
   }
 
   /** Derive the data state from the session-list phase. */
-  function statusOf(list: ReturnType<NonNullable<SessionsFace['list']>['getSnapshot']> | undefined): BoardStatus {
+  function statusOf(list: SessionListLike | undefined): BoardStatus {
     if (options.sessions?.list === undefined || list === undefined) return 'error'
     return list.phase === 'pending' ? 'loading' : 'ready'
   }
@@ -313,13 +306,6 @@ export function createBoardStore(options: BoardStoreOptions): BoardStore {
         }
       }
       recompute()
-    },
-    refresh() {
-      if (disposed) return
-      // Republish immediately so the view leaves any stale error/loading posture
-      // even when the refetch itself fails again.
-      recompute()
-      syncConfig()
     },
     dispose() {
       if (disposed) return
