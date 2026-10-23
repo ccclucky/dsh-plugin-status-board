@@ -163,30 +163,54 @@ jobs:
       # shares nothing with this checkout. This is the only step that can see a
       # packaging mistake (a missing `files` entry, a bad `exports` map).
       - name: Install the published version in a clean directory
-        # npm's CDN takes a moment to agree with the registry, so retry - but a
-        # bounded number of times. `until cmd; do ...; done` would spin forever
-        # on a publish that genuinely cannot be installed, hanging the runner
-        # instead of failing the release.
         if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
         env:
           VERSION: ${{ steps.gate.outputs.version }}
         run: |
           set -euo pipefail
+
+          # Two failure modes look identical from here but are not the same
+          # event, and only one of them is a defect in the package:
+          #
+          #   a) the registry has not finished making the version visible -
+          #      `npm view` and `npm install` read different CDN-cached
+          #      documents, so a just-published version can answer ETARGET for
+          #      minutes while the publish itself already succeeded;
+          #   b) the published package really cannot be installed.
+          #
+          # The first release run of this workflow conflated them into one retry
+          # loop and failed a publish that had worked: eight attempts across 150s
+          # all returned ETARGET, the package installed fine in 25s locally, and
+          # the red run told nobody that 0.2.2 was actually live. So: wait for
+          # visibility first (generously, and it is NOT a package failure), then
+          # install once, and treat an install failure after visibility as real.
+          echo "::group::waiting for the registry to publish $VERSION"
+          visible=no
+          for attempt in $(seq 1 30); do
+            if npm view --prefer-online "dsh-plugin-status-board@$VERSION" version >/dev/null 2>&1; then
+              visible=yes
+              echo "visible after $attempt attempt(s)"
+              break
+            fi
+            echo "attempt $attempt/30: not visible yet"
+            sleep 20
+          done
+          echo "::endgroup::"
+
+          if [ "$visible" != yes ]; then
+            # Ambiguous by construction, so say which of the two it might be and
+            # send the human to check the registry rather than asserting a cause.
+            echo "::error::$VERSION is still not visible on the registry after 10 minutes. Check https://www.npmjs.com/package/dsh-plugin-status-board before assuming the publish failed - the publish step reported success."
+            exit 1
+          fi
+
           dir=$(mktemp -d)
           cd "$dir"
           npm init -y >/dev/null
-          published=no
-          for attempt in 1 2 3 4 5 6 7 8; do
-            if npm install --no-audit --no-fund "dsh-plugin-status-board@$VERSION" >install.log 2>&1; then
-              published=yes
-              break
-            fi
-            echo "attempt $attempt/8 failed; waiting for the registry"
-            sleep 20
-          done
-          if [ "$published" != yes ]; then
-            echo "::error::$VERSION is not installable after 8 attempts"
-            tail -n 25 install.log
+          # Past visibility, a failure here is a real packaging defect, so one
+          # attempt is enough and its output is the diagnostic.
+          if ! npm install --no-audit --no-fund --prefer-online "dsh-plugin-status-board@$VERSION"; then
+            echo "::error::$VERSION is visible on the registry but cannot be installed - this is a packaging defect"
             exit 1
           fi
           test -f node_modules/dsh-plugin-status-board/lib/client.js
@@ -199,5 +223,14 @@ jobs:
             const m = await import('./node_modules/dsh-plugin-status-board/lib/index.js');
             if (typeof m.apply !== 'function') throw new Error('published Host half does not export apply()');
             if (m.Config === undefined) throw new Error('published Host half does not export Config');
+          "
+          # Provenance is the point of publishing from CI, so assert it landed
+          # instead of trusting that `--provenance` was on the command line.
+          node --input-type=module -e "
+            const r = await fetch('https://registry.npmjs.org/-/npm/v1/attestations/dsh-plugin-status-board@${VERSION}');
+            if (!r.ok) throw new Error('no provenance attestation is reachable for ${VERSION} (HTTP ' + r.status + ')');
+            const { attestations } = await r.json();
+            if (!attestations?.length) throw new Error('attestation list is empty');
+            console.log('provenance attestation present');
           "
           echo "installed and loaded dsh-plugin-status-board@$VERSION"

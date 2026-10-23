@@ -23,6 +23,26 @@ published artefacts attributable — see *Provenance* below.
 - `workflow_dispatch` entry point with a default **dry run**, so the chain can
   be proven without shipping anything.
 
+### Fixed (found by the first real run of this pipeline)
+
+0.2.2 published successfully — `Publish to npm` passed and the registry confirms
+the version carries a SLSA provenance attestation — but the *install-back* step
+of that same run went red. The published artefact was fine; the check was wrong.
+
+- The step failed with `ETARGET: No matching version found`, i.e. the registry
+  had not yet made the just-published version visible to that runner. That is
+  normal propagation lag, not a defect.
+- The defect was conflating two different failure modes in one retry loop: "the
+  registry has not caught up" and "the package cannot be installed". Eight
+  attempts across 150 seconds all landed inside the propagation window, so a
+  publish that had worked was reported as a failure.
+- Now: visibility is polled first (`npm view`, bounded at 30 × 20s), and only
+  after the version is visible is it installed, **once** — a failure at that
+  point really is a packaging defect, and the two cases now report differently.
+- Added an assertion that the provenance attestation is actually reachable on
+  the registry, rather than assuming `--provenance` on the command line implies
+  an attached attestation.
+
 ### Changed
 
 - The npm credential moved out of the maintainer's laptop and into a repository
