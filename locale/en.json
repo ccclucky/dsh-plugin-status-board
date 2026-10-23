@@ -5,6 +5,7 @@
   },
   "panel": {
     "title": "Session Status Board",
+    "shortTitle": "Sessions",
     "subtitle": "Sessions grouped by state"
   },
   "bucket": {

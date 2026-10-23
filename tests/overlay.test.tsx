@@ -116,6 +116,31 @@ describe('createOverlayController', () => {
 })
 
 describe('BoardOverlay', () => {
+  it('renders the nav-row readout badge even while closed', () => {
+    // The badge is the entry's whole point: the framework row can only carry
+    // icon + plain text, so the coloured counts live in the overlay layer and
+    // must be present without the panel being open.
+    const store = makeStore([])
+    const row = document.createElement('button')
+    row.dataset.statusBoardEntry = 'true'
+    document.body.append(row)
+    const container = mount(
+      createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
+    )
+    expect(container.querySelector('.status-board__row-badge')).not.toBeNull()
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.querySelectorAll('.status-board__metric')).toHaveLength(3)
+    row.remove()
+  })
+
+  it('renders no badge when there is no nav row to attach it to', () => {
+    // The collapsed rail draws no nav rows, and the badge must not float free.
+    const store = makeStore([])
+    const container = mount(
+      createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
+    )
+    expect(container.querySelector('.status-board__row-badge')).toBeNull()
+  })
   it('renders nothing until opened', () => {
     const store = makeStore([])
     const container = mount(

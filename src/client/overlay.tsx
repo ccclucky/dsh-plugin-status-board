@@ -32,7 +32,6 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type MouseEvent as ReactMouseEvent,
   type ReactElement,
 } from 'react'
 import { createTranslate } from '../shared/i18n.ts'
@@ -204,8 +203,29 @@ export function BoardOverlay({
   const translate = createTranslate(state.locale)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const panelId = `status-board-overlay-${useId()}`
+  const counts = countBoards(state)
 
   const close = useCallback(() => controller.close(), [controller])
+
+  // The nav row's measurements, so the readout badge and the panel can both sit
+  // against the row that owns them instead of at a fixed spot in the frame.
+  const [rowRect, setRowRect] = useState<{ right: number; top: number; height: number } | null>(null)
+  useEffect(() => {
+    const measure = (): void => {
+      const row = document.querySelector<HTMLElement>('[data-status-board-entry]')
+      if (row === null) {
+        setRowRect(null)
+        return
+      }
+      const rect = row.getBoundingClientRect()
+      setRowRect({ right: rect.right, top: rect.top, height: rect.height })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+    // Re-measured when the board changes too: a count going from 3 to 12 changes
+    // the badge width, and the label can reflow the row above it.
+  }, [open, state.board])
 
   // Escape closes from anywhere: the panel is not modal, so the key must work
   // even while focus sits inside the conversation behind it.
@@ -273,17 +293,38 @@ export function BoardOverlay({
     return () => window.removeEventListener('resize', place)
   }, [open])
 
-  if (!open) return null
+  // The readout badge renders whether the panel is open or not: it is the whole
+  // point of the nav entry, which the framework draws as icon + plain text and
+  // therefore cannot carry three coloured counts of its own.
+  const badge =
+    rowRect === null ? null : (
+      <div
+        className="status-board__row-badge"
+        aria-hidden="true"
+        style={{ top: rowRect.top + rowRect.height / 2, right: `calc(100vw - ${rowRect.right}px + 10px)` }}
+      >
+        <span className="status-board__metric" data-metric="decision">
+          <span className="status-board__metric-dot" />
+          {counts.decision}
+        </span>
+        <span className="status-board__metric" data-metric="executing">
+          <span className="status-board__metric-dot" />
+          {counts.executing}
+        </span>
+        <span className="status-board__metric" data-metric="recent">
+          <span className="status-board__metric-dot" />
+          {counts.recent}
+        </span>
+      </div>
+    )
+
+  if (!open) return badge
 
   const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
 
   return (
-    <div
-      className="status-board__overlay-root"
-      // Stop a press inside the board from reaching the outside-click handler of
-      // any other overlay entry.
-      onMouseDown={(event: ReactMouseEvent) => event.stopPropagation()}
-    >
+    <div className="status-board__overlay-root">
+      {badge}
       <div
         className="status-board__overlay"
         id={panelId}
@@ -296,8 +337,12 @@ export function BoardOverlay({
         style={anchor === null ? undefined : { position: 'fixed', left: anchor.left, top: anchor.top }}
       >
         <div className="status-board__overlay-bar">
-          <span className="status-board__overlay-title">{translate('panel.title')}</span>
-          <span className="status-board__overlay-total">{translate('summary.total', { total })}</span>
+          <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
+          {/* The bare number, not "Sessions: 10": the bar is narrow and the
+              label already says what is being counted. */}
+          <span className="status-board__overlay-total" aria-label={translate('summary.total', { total })}>
+            {total}
+          </span>
           <button
             type="button"
             className="status-board__overlay-close"

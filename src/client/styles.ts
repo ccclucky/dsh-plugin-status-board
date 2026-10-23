@@ -94,7 +94,7 @@ export const PANEL_CSS = String.raw`
 .status-board__scroll {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -188,9 +188,9 @@ export const PANEL_CSS = String.raw`
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -199,7 +199,7 @@ export const PANEL_CSS = String.raw`
 .status-board__count {
   flex: 0 0 auto;
   color: var(--sb-accent);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -217,7 +217,7 @@ export const PANEL_CSS = String.raw`
 
 .status-board__metric-n {
   color: var(--sb-accent);
-  font-size: 19px;
+  font-size: 24px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -226,7 +226,7 @@ export const PANEL_CSS = String.raw`
 
 .status-board__metric-u {
   color: var(--dsw-alias-label-secondary);
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 
 .status-board__rule {
@@ -254,8 +254,8 @@ export const PANEL_CSS = String.raw`
   gap: 7px;
   box-sizing: border-box;
   width: 100%;
-  min-height: 28px;
-  padding: 4px 6px;
+  min-height: 30px;
+  padding: 5px 7px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -301,7 +301,7 @@ button.status-board__row:active {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 12.5px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -309,7 +309,7 @@ button.status-board__row:active {
 .status-board__row-meta {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
-  font-size: 10.5px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -346,6 +346,21 @@ button.status-board__row:active {
 
 .status-board__nav-glyph[data-open="true"] {
   color: var(--dsw-alias-brand-primary);
+}
+
+/* ── Nav-row readout badge ───────────────────────────────────────────────── */
+
+/* Pinned to the right of the nav row. The row itself belongs to the framework
+   and can only carry icon + plain text, so this is how the three counts stay
+   colour-coded the way the design calls for. It is not interactive: presses
+   fall through to the row underneath, which owns the toggle. */
+.status-board__row-badge {
+  position: fixed;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 /* ── Sidebar-foot readout ────────────────────────────────────────────────── */

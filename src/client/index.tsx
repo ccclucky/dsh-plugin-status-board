@@ -28,7 +28,7 @@
 
 import { createElement, type ReactElement } from 'react'
 import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
-import { createOverlayController, BoardNavEntry, BoardOverlay, describeCountsShort } from './overlay.tsx'
+import { createOverlayController, BoardNavEntry, BoardOverlay } from './overlay.tsx'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
@@ -179,13 +179,10 @@ export function apply(ctx: ClientContext): void {
   const NavEntry = ({ size }: { size: number }): ReactElement =>
     createElement(BoardNavEntry, { controller, store, size })
 
-  // The row is icon + label only, so the counts ride in the label text: it is
-  // the one part of the row this plugin can shape.
-  const navLabel = (): string => {
-    const state = store.getSnapshot()
-    const translate = createTranslate(state.locale)
-    return `${translate('panel.title')} · ${describeCountsShort(translate, state)}`
-  }
+  // The counts are drawn by `BoardOverlay` as a badge pinned to this row's right
+// edge: the framework renders the label as plain text, so a coloured readout
+// cannot live inside it.
+  const navLabel = (): string => createTranslate(store.getSnapshot().locale)('panel.title')
 
   const Overlay = (): ReactElement | null =>
     createElement(BoardOverlay, { controller, store, resolveNavigation })

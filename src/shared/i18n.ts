@@ -19,7 +19,12 @@ export type LocaleId = 'zh' | 'en'
 /** Shape of one locale file. */
 export interface LocaleFile {
   readonly meta: { readonly title: string; readonly description: string }
-  readonly panel: { readonly title: string; readonly subtitle: string }
+  readonly panel: {
+    readonly title: string
+    /** Short form for the floating panel's bar, which has a count beside it. */
+    readonly shortTitle: string
+    readonly subtitle: string
+  }
   readonly bucket: {
     readonly decision: string
     readonly executing: string

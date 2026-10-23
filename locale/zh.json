@@ -5,6 +5,7 @@
   },
   "panel": {
     "title": "会话状态看板",
+    "shortTitle": "会话状态",
     "subtitle": "按状态聚合的会话视图"
   },
   "bucket": {
