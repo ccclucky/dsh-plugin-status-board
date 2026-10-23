@@ -22,7 +22,8 @@
     "loading": "正在读取会话…",
     "empty": "还没有可展示的会话",
     "error": "读取会话失败，看板可能不完整",
-    "retry": "重试"
+    "retry": "重试",
+    "noMatch": "没有匹配的会话"
   },
   "summary": {
     "total": "共 {total} 个会话",
@@ -37,7 +38,8 @@
   },
   "action": {
     "open": "打开会话",
-    "refresh": "刷新看板"
+    "refresh": "刷新看板",
+    "filter": "筛选会话"
   },
   "a11y": {
     "panel": "会话状态看板面板",

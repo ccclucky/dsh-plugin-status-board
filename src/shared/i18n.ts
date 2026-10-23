@@ -36,6 +36,8 @@ export interface LocaleFile {
     readonly empty: string
     readonly error: string
     readonly retry: string
+    /** Shown when the filter matched nothing, distinct from "no sessions". */
+    readonly noMatch: string
   }
   readonly summary: { readonly total: string; readonly truncated: string }
   readonly time: {
@@ -45,7 +47,12 @@ export interface LocaleFile {
     readonly daysAgo: string
     readonly unknown: string
   }
-  readonly action: { readonly open: string; readonly refresh: string }
+  readonly action: {
+    readonly open: string
+    readonly refresh: string
+    /** Placeholder and accessible label of the sidebar filter box. */
+    readonly filter: string
+  }
   readonly a11y: {
     readonly panel: string
     readonly running: string

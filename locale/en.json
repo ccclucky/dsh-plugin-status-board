@@ -22,7 +22,8 @@
     "loading": "Reading sessions…",
     "empty": "No sessions to show yet",
     "error": "Could not read sessions; the board may be incomplete",
-    "retry": "Retry"
+    "retry": "Retry",
+    "noMatch": "No matching sessions"
   },
   "summary": {
     "total": "Sessions: {total}",
@@ -37,7 +38,8 @@
   },
   "action": {
     "open": "Open session",
-    "refresh": "Refresh board"
+    "refresh": "Refresh board",
+    "filter": "Filter sessions"
   },
   "a11y": {
     "panel": "Session status board panel",

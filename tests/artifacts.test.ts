@@ -84,10 +84,12 @@ describe('built artifacts', () => {
 
   it('keeps the panel stylesheet byte-identical to the declared source', () => {
     // The envelope wrapper used to re-indent the bundle body, which silently
-    // rewrote this string literal. Compare a distinctive slice instead of the
+    // rewrote this string literal. Compare distinctive slices instead of the
     // whole file so unrelated minification changes do not break the check.
     const client = readFileSync(clientPath, 'utf8')
-    expect(client).toContain('.status-board__card[data-bucket="decision"]')
-    expect(client).toContain('grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))')
+    expect(client).toContain('.status-board__dot[data-state="decision"]')
+    expect(client).toContain('background: var(--dsw-specific-sidebar-fill)')
+    // The sidebar module must not regress to the old multi-column page grid.
+    expect(client).not.toContain('grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))')
   })
 })

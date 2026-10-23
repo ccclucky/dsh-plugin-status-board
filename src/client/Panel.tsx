@@ -1,21 +1,24 @@
 /**
- * The board panel: three collapsible boards, newest-first rows, responsive grid.
+ * The board view — rendered INSIDE the left sidebar, as a module beside the
+ * workspace list, not as a full main-column page.
+ *
+ * Layout consequences of that destination:
+ * - One column, not a responsive grid: the sidebar is ~280px wide, so a
+ *   multi-column grid would collapse anyway and only waste vertical rhythm.
+ * - Compact rows: a state dot, one ellipsised title line, and the relative time.
+ *   The workspace path moves to the tooltip.
+ * - Boards are collapsible sections with a live count, so a collapsed board
+ *   still states how much it hides.
  *
  * Design notes (Nielsen's heuristics where they bite):
- * - *Visibility of system status*: every board carries a live row count, so a
- *   collapsed board still says how much it hides; loading and error states are
- *   distinct from "no sessions".
- * - *Recognition over recall*: the two boards that need the user (decision) or
- *   describe current work (executing) stay expanded unless configured
- *   otherwise; only the archival board starts collapsed.
- * - *Aesthetic and minimalist design*: a row shows a state dot, a title and one
- *   meta line; the workspace path is a tooltip, not a third competing column.
- * - *User control and freedom*: a failed read offers a retry instead of a dead
- *   end.
- * - *Accessibility*: each header is an `<h2>` wrapping a disclosure `<button>`
- *   (the WAI-ARIA accordion pattern), so the heading survives in the
- *   accessibility tree while the button keeps button semantics. `aria-controls`
- *   always resolves: the region stays mounted and is hidden with `hidden`.
+ * - *Visibility of system status*: counts per board, and loading is distinct
+ *   from empty.
+ * - *Recognition over recall*: the two boards that need attention start
+ *   expanded; only the archival board starts collapsed.
+ * - *Accessibility*: each section header is an `<h2>` wrapping a disclosure
+ *   `<button>` (the WAI-ARIA accordion pattern), so the heading survives in the
+ *   accessibility tree. `aria-controls` always resolves because the region stays
+ *   mounted and is hidden with `hidden`.
  * @module dsh-plugin-status-board/client/Panel
  */
 
@@ -35,10 +38,23 @@ export interface PanelProps {
    *
    * A function rather than a captured handler: `uiWorkspace` may mount after
    * this plugin, so the render (not `apply`) has to be the moment the
-   * affordance is decided. A click-time-only lookup would leave rows rendered
-   * as static text forever on such a composition.
+   * affordance is decided.
    */
   readonly resolveNavigation?: (() => ((sessionId: string) => void) | undefined) | undefined
+}
+
+/**
+ * Filter rows by a case-insensitive substring of the title.
+ *
+ * This module replaces the shipped workspace browser, whose search box is gone
+ * with it; without a filter, a long list of sessions in a 280px column is not
+ * navigable. Matching the title only is deliberate: the workspace path is not
+ * rendered, so matching it would produce rows that appear to match nothing.
+ */
+function matchesFilter(entries: readonly BoardEntry[], query: string): readonly BoardEntry[] {
+  const needle = query.trim().toLowerCase()
+  if (needle.length === 0) return entries
+  return entries.filter(entry => entry.title.toLowerCase().includes(needle))
 }
 
 /** How often relative timestamps are refreshed while nothing else changes. */
@@ -47,10 +63,8 @@ const CLOCK_INTERVAL_MS = 30_000
 /**
  * A coarse clock for relative timestamps.
  *
- * The store only republishes when session data changes, so a board left open on
- * an idle page would otherwise keep saying "just now" for an hour. A 30-second
- * tick is cheap, stops on unmount, and keeps the text honest without making the
- * store own a timer.
+ * The store only republishes when session data changes, so a sidebar left open
+ * on an idle page would otherwise keep saying "just now" for an hour.
  */
 function useRelativeClock(): number {
   const [now, setNow] = useState(() => Date.now())
@@ -65,7 +79,7 @@ function useRelativeClock(): number {
 
 /** The chevron drawn by the toggle; pure markup, no icon dependency. */
 function Chevron({ collapsed }: { readonly collapsed: boolean }): ReactElement {
-  const style: CSSProperties = { width: 12, height: 12, display: 'block' }
+  const style: CSSProperties = { width: 10, height: 10, display: 'block' }
   return (
     <svg
       className="status-board__chevron"
@@ -75,12 +89,12 @@ function Chevron({ collapsed }: { readonly collapsed: boolean }): ReactElement {
       focusable="false"
       style={style}
     >
-      <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
-/** The board's own glyph, reused by the sidebar panel icon. */
+/** The board's own glyph, reused by any icon surface. */
 export function BoardGlyph({ size = 16 }: { readonly size?: number }): ReactElement {
   return (
     <svg
@@ -115,12 +129,12 @@ export function Row({
   readonly onOpen: ((sessionId: string) => void) | undefined
 }): ReactElement {
   const meta = formatRelativeTime(now, entry.lastActivityAt, translate)
-  // The workspace path is useful but would cost a third column; the native
-  // tooltip carries it without competing for the row's width.
+  // The workspace path would cost a third column in a 280px sidebar; the native
+  // tooltip carries it instead.
   const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
   const metaId = `status-board-meta-${entry.id}`
   const content = [
-    <span className="status-board__dot" aria-hidden="true" key="dot" />,
+    <span className="status-board__dot" data-state={bucket} aria-hidden="true" key="dot" />,
     <span className="status-board__row-title" key="title">
       {entry.title}
     </span>,
@@ -146,8 +160,7 @@ export function Row({
         data-state={bucket}
         title={tooltip}
         // The visible title is the accessible name; the relative time rides
-        // along as the description so a screen-reader user hears when the
-        // session last moved.
+        // along as the description.
         aria-label={entry.title}
         aria-describedby={metaId}
         onClick={() => onOpen(entry.id)}
@@ -158,13 +171,14 @@ export function Row({
   )
 }
 
-/** One board. */
+/** One collapsible board section. */
 function Bucket({
   id,
   state,
   store,
   translate,
   now,
+  query,
   onOpenSession,
 }: {
   readonly id: BucketId
@@ -172,29 +186,32 @@ function Bucket({
   readonly store: BoardStore
   readonly translate: Translate
   readonly now: number
+  readonly query: string
   readonly onOpenSession: ((sessionId: string) => void) | undefined
 }): ReactElement | null {
   const board = state.board.buckets.find(candidate => candidate.id === id)
   if (board === undefined) return null
 
-  // One `useId` per board keeps the DOM ids unique when two panels mount at
-  // once (split view, a future right-hand dock), which a constant id cannot.
+  // One `useId` per board keeps DOM ids unique when the sidebar is torn down and
+  // remounted (or two windows are open).
   const instanceId = useId()
   const headingId = `status-board-heading-${instanceId}`
   const regionId = `status-board-region-${instanceId}`
 
+  const visible = matchesFilter(board.entries, query)
   const collapsed = isCollapsed(state.collapse, id)
-  const count = board.entries.length
+  const count = visible.length
   const name = translate(`bucket.${id}` as MessageKey)
   const hint = translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
+  const filtering = query.trim().length > 0
 
-  // An empty board is hidden when the operator turned headers off; the header
-  // still renders otherwise so the three-column rhythm stays stable.
-  if (count === 0 && !state.config.showEmptyBuckets) return null
+  // While filtering, a board with no match is noise: the user asked a question
+  // and this board has nothing to say about it.
+  if (filtering && count === 0) return null
+  // An empty board is hidden when the operator turned headers off.
+  if (!filtering && count === 0 && !state.config.showEmptyBuckets) return null
 
   // While the list is still being enumerated, "no sessions" is not a fact yet.
-  // Rendering it beside the panel's "Reading sessions…" line would tell the user
-  // two contradictory things at once.
   const loading = state.status === 'loading' && count === 0
 
   return (
@@ -206,6 +223,7 @@ function Bucket({
           aria-expanded={!collapsed}
           aria-controls={regionId}
           aria-label={bucketToggleLabel(translate, name, collapsed, count)}
+          title={hint}
           onClick={() => store.toggle(id)}
         >
           <Chevron collapsed={collapsed} />
@@ -215,17 +233,15 @@ function Bucket({
           </span>
         </button>
       </h2>
-      <p className="status-board__hint">{hint}</p>
       {/* Mounted even while collapsed so `aria-controls` always resolves to a
           real element (ARIA requires IDREFs to resolve). `role="group"`, not
-          `role="region"`: the card is already a landmark, and a nested region
-          with the same name would be announced twice. */}
+          `role="region"`: the module is already a landmark. */}
       <div id={regionId} role="group" aria-label={name} hidden={collapsed}>
         {loading ? null : count === 0 ? (
           <p className="status-board__empty">{translate('bucket.empty')}</p>
         ) : (
           <ul className="status-board__rows">
-            {board.entries.map(entry => (
+            {visible.map(entry => (
               <Row
                 key={entry.id}
                 entry={entry}
@@ -246,14 +262,11 @@ function Bucket({
 }
 
 /**
- * The board panel.
+ * The board module.
  *
  * @param props - the store plus the navigation seam.
  */
 export function BoardPanel({ store, resolveNavigation }: PanelProps): ReactElement {
-  // Resolved during render, not at `apply` time: `uiWorkspace` may mount after
-  // this plugin, and a value captured once would permanently lock the rows into
-  // their non-interactive form.
   const onOpenSession = resolveNavigation?.()
   return <BoardPanelBody store={store} onOpenSession={onOpenSession} />
 }
@@ -269,35 +282,56 @@ function BoardPanelBody({
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
   const now = useRelativeClock()
+  const [query, setQuery] = useState('')
   const headingId = `status-board-title-${useId()}`
+  const filterId = `status-board-filter-${useId()}`
   const total = totalRows(state.board)
 
+  // How many rows survive the filter, so "no match" can be told apart from
+  // "nothing here".
+  const visibleTotal = BUCKET_IDS.reduce((sum, id) => {
+    const board = state.board.buckets.find(candidate => candidate.id === id)
+    return sum + (board === undefined ? 0 : matchesFilter(board.entries, query).length)
+  }, 0)
+
   return (
-    <div className="status-board" role="region" aria-labelledby={headingId}>
-      {/* Component-local styles: React removes them when the panel unmounts, so
+    <div className="status-board" aria-labelledby={headingId}>
+      {/* Component-local styles: React removes them when the module unmounts, so
           the plugin never leaves a global stylesheet behind. */}
       <style>{PANEL_CSS}</style>
       <div className="status-board__head">
-        <div className="status-board__heading-group">
-          <h1 className="status-board__title" id={headingId}>
-            {translate('panel.title')}
-          </h1>
-          <p className="status-board__subtitle">{translate('panel.subtitle')}</p>
-        </div>
+        <h2 className="status-board__title" id={headingId}>
+          {translate('panel.title')}
+        </h2>
         <span className="status-board__total">{translate('summary.total', { total })}</span>
       </div>
 
+      {/* The shipped workspace browser's search box went with it when this
+          module replaced that region; a 280px column of sessions needs a
+          filter to stay navigable. */}
+      <label className="status-board__filter-label" htmlFor={filterId} hidden>
+        {translate('action.filter')}
+      </label>
+      <input
+        id={filterId}
+        className="status-board__filter"
+        type="search"
+        value={query}
+        placeholder={translate('action.filter')}
+        aria-label={translate('action.filter')}
+        onChange={event => setQuery(event.target.value)}
+      />
+
       {/* Not retryable: the only condition that reaches this state is a
           composition with no session list at all, which the user cannot change
-          from here. Offering a retry button would be a dead end dressed up as
-          an action. */}
+          from here. */}
       {state.status === 'error' ? (
         <p className="status-board__alert" role="alert">
           {translate('state.error')}
         </p>
       ) : null}
 
-      <div className="status-board__grid">
+      <div className="status-board__scroll">
         {BUCKET_IDS.map(id => (
           <Bucket
             key={id}
@@ -306,6 +340,7 @@ function BoardPanelBody({
             store={store}
             translate={translate}
             now={now}
+            query={query}
             onOpenSession={onOpenSession}
           />
         ))}
@@ -319,6 +354,12 @@ function BoardPanelBody({
 
       {state.status === 'ready' && total === 0 ? (
         <p className="status-board__empty">{translate('state.empty')}</p>
+      ) : null}
+
+      {state.status !== 'loading' && total > 0 && visibleTotal === 0 ? (
+        <p className="status-board__empty" role="status">
+          {translate('state.noMatch')}
+        </p>
       ) : null}
     </div>
   )

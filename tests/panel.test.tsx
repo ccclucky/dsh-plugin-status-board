@@ -153,7 +153,9 @@ describe('BoardPanel', () => {
 
   it('wraps each toggle in a real heading instead of a role inside a button', async () => {
     const markup = await render([])
-    expect(markup.match(/<h2/g)).toHaveLength(3)
+    // Three board headers plus the module title: the module is a sidebar block,
+    // so its own title is an h2 rather than the h1 a full page would use.
+    expect(markup.match(/<h2/g)).toHaveLength(4)
     // The broken pattern this replaces: a `role="heading"` span nested in the
     // button subtree, which the accessibility tree would discard.
     expect(markup).not.toContain('role="heading"')
@@ -325,12 +327,12 @@ describe('BoardPanel', () => {
     expect(styleBlock).toContain('var(--dsw-alias-')
   })
 
-  it('announces exactly one landmark for the panel, with groups inside', async () => {
+  it('renders the three boards as labelled groups inside the sidebar module', async () => {
     const markup = await render([])
-    expect(markup.match(/role="region"/g)).toHaveLength(1)
+    // The module lives inside the sidebar, which is already a landmark, so it
+    // claims no landmark of its own; its three boards are groups.
+    expect(markup).not.toContain('role="region"')
     expect(markup).toContain('aria-labelledby="status-board-title-')
-    // Nested boards are groups, not regions, so a screen reader does not hear
-    // four landmarks of which three repeat a board name.
     expect(markup.match(/role="group"/g)).toHaveLength(3)
   })
 

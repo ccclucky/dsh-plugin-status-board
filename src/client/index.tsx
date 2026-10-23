@@ -27,17 +27,19 @@
  */
 
 import { createElement, type ReactElement } from 'react'
-import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
-import { BoardGlyph, BoardPanel } from './Panel.tsx'
+import { LOCALE_NAMESPACE } from '../shared/i18n.ts'
+import { BoardPanel } from './Panel.tsx'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
 import zhFile from '../../locale/zh.json'
 
-/** The panel id shared by the sidebar icon and the main panel key. */
-export const PANEL_ID = 'status-board'
-
-/** Services the Client half requires; Cordis waits for all of them. */
+/**
+ * Services the Client half requires; Cordis waits for all of them.
+ *
+ * `uiWorkspace` is deliberately NOT here: it is optional, and its absence only
+ * removes the rows' "open" affordance (see `resolveNavigation`).
+ */
 export const inject = ['slots', 'sessions', 'locale']
 
 /** The Harness locale service face, mirrored structurally. */
@@ -160,42 +162,17 @@ export function apply(ctx: ClientContext): void {
   }
 
   // ── Slots ─────────────────────────────────────────────────────────────────
-  // The sidebar icon and the main panel share one id; that is how the shell links
-  // a panellist button to the panel it selects. The shell owns the button chrome
-  // and dispatches on the registration's `id`, so the icon component only draws
-  // the glyph — it needs no click handler of its own.
-  const panelLabel = (): string => createTranslate(ctx.locale.getSnapshot().active)('panel.title')
+  // The module REPLACES the shipped workspace browser, which is the point: the
+  // spec asks for the left list itself to be the three boards. `sidebar.workspaces`
+  // is a single slot, so registering here shadows the shipped occupant rather
+  // than sitting beside it — which is why the module reimplements the two
+  // capabilities that browser provided and this plugin still needs: opening a
+  // session (below) and filtering the list (in the view's search box).
+  const BoardComponent = (): ReactElement => createElement(BoardPanel, { store, resolveNavigation })
 
-  const PanelComponent = (): ReactElement => createElement(BoardPanel, { store, resolveNavigation })
-  const IconComponent = ({ size }: { size?: number | undefined }): ReactElement =>
-    createElement(BoardIcon, { size })
-
-  ctx.slots.inject('sidebar.panellist', () =>
-    ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 20, label: panelLabel }, IconComponent),
-  )
-
-  ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, PanelComponent))
-}
-
-/**
- * The sidebar panel icon.
- *
- * The owner supplies `{size, active}` and owns the button chrome, so this
- * component draws only the glyph. It is decorative: the shell derives the
- * accessible name from the registration's `label`, and the glyph itself is
- * hidden from assistive technology.
- */
-function BoardIcon({ size }: { readonly size?: number | undefined }): ReactElement {
-  return createElement(
-    'span',
-    {
-      role: 'presentation',
-      'aria-hidden': true,
-      // Inline presentation only: this element renders in the sidebar, where the
-      // panel's local stylesheet is not mounted, and the shell already supplies
-      // the surrounding colour through `currentColor`.
-      style: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
-    },
-    createElement(BoardGlyph, { size: size ?? 18 }),
+  // `id` is the claimant key: a single slot tracks which registration owns it, so
+  // an unnamed registration can succeed while the shipped occupant stays put.
+  ctx.slots.inject('sidebar.workspaces', () =>
+    ctx.slots.register({ name: 'sidebar.workspaces', id: 'status-board' }, BoardComponent),
   )
 }

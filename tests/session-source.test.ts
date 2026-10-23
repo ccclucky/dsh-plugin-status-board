@@ -9,7 +9,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   collectSessionSignals,
-  hasReadyPendingTeamTask,
   isAwaitingDecision,
   isSubagentChild,
 } from '../src/client/session-source.ts'
@@ -46,33 +45,18 @@ describe('isAwaitingDecision', () => {
     expect(isAwaitingDecision(undefined)).toBe(false)
   })
 
-  it('is true for a ready pending team task', () => {
-    const projection: ProjectionLike = {
-      values: { agentTeam: { tasks: [{ status: 'pending', ready: true }] } },
-    }
-    expect(isAwaitingDecision(projection)).toBe(true)
-  })
-
-  it('ignores a blocked or already claimed team task', () => {
-    expect(isAwaitingDecision({ values: { agentTeam: { tasks: [{ status: 'pending', ready: false }] } } })).toBe(false)
-    expect(isAwaitingDecision({ values: { agentTeam: { tasks: [{ status: 'in_progress', ready: true }] } } })).toBe(false)
+  it('ignores team tasks: a finished ticket keeps its pending rows forever', () => {
+    // Real team boards record tasks as `pending` with no consumer-facing
+    // "waiting on the user" marker (measured on disk: `ready` is absent from the
+    // wire, so a rule keyed on it is dead). Treating them as decisions pinned a
+    // six-day-old completed session to the decision board, which is exactly the
+    // defect this test locks out.
+    const withPendingTasks = { values: { agentTeam: { tasks: [{ status: 'pending', ready: true }] } } }
+    expect(isAwaitingDecision(withPendingTasks as never)).toBe(false)
   })
 
   it('survives a projection whose values have the wrong shape', () => {
     expect(isAwaitingDecision({ values: { userQuestions: 'x' as never } })).toBe(false)
-    expect(isAwaitingDecision({ values: { agentTeam: { tasks: 'x' as never } } })).toBe(false)
-  })
-})
-
-describe('hasReadyPendingTeamTask', () => {
-  it('is false when the projection carries no team board', () => {
-    expect(hasReadyPendingTeamTask(undefined)).toBe(false)
-    expect(hasReadyPendingTeamTask({})).toBe(false)
-    expect(hasReadyPendingTeamTask({ values: {} })).toBe(false)
-  })
-
-  it('is false when tasks is not an array', () => {
-    expect(hasReadyPendingTeamTask({ values: { agentTeam: { tasks: 'x' as never } } })).toBe(false)
   })
 })
 

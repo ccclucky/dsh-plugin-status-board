@@ -6,30 +6,39 @@
  * the classifier, the view and every test keep working against the reduced
  * shape.
  *
- * Every field read below was checked against the installed Harness
- * (`@deepseek-ai/dsh-api-session-controller`): `SessionListState` publishes
- * `{ ids, byId, phase, projectionsBySession }`, and each `SessionSummary`
- * carries `id / displayTitle / title? / cwd? / parentId? / origin? / running /
- * blank / updatedAt`. There is no scalar "awaiting decision" field, so that
- * state is derived from the session's own projections instead — see
- * {@link isAwaitingDecision}.
+ * ## What this adapter learned from real data
+ *
+ * Every field read here was checked against the installed Harness AND against
+ * 188 real session logs on disk (`SessionListState` publishes
+ * `{ ids, byId, phase, projectionsBySession }`; a summary carries
+ * `id / displayTitle / title? / cwd? / parentId? / origin? / running / blank /
+ * updatedAt`).
+ *
+ * Two traps were found by auditing those logs rather than by reading types:
+ *
+ * 1. **`team/task.ready` does not exist.** A team board records
+ *    `{ id, revision, subject, description, status, ... }`; there is no `ready`
+ *    field on the wire, so a rule keyed on it is dead code. Worse, the tasks a
+ *    board carries are the team's *historical* work items: a finished ticket
+ *    keeps listing its `pending` tasks forever, so treating them as "needs a
+ *    decision" pins a completed session to the decision board indefinitely.
+ * 2. **A parked question is an `ask_user_question` call without its result.**
+ *    That is what the logs show for a genuinely blocked session, and it is the
+ *    only signal that truly puts work on the user's desk.
+ *
+ * The consequence: the decision board is driven ONLY by the `userQuestions`
+ * projection. Anything broader invents a state the runtime does not have.
  * @module dsh-plugin-status-board/client/session-source
  */
 
 import type { SessionSignal } from '../shared/types.ts'
 
-/** One team-task row of the Lead session's `agentTeam` projection. */
-export interface TeamTaskLike {
-  readonly status?: string | undefined
-  readonly ready?: boolean | undefined
-}
-
 /**
  * The `userQuestions` projection face.
  *
- * `active` holds the questions currently waiting for a human answer; an empty
- * or absent list means nothing is pending. The projection is the runtime's
- * authoritative "the user owes this session an answer" signal.
+ * `active` holds the questions currently waiting for a human answer. When the
+ * deployment publishes this projection it is the cheapest correct signal; an
+ * absent projection simply means "nothing is parked on this session".
  */
 export interface UserQuestionsProjectionLike {
   readonly active?: readonly unknown[] | undefined
@@ -40,9 +49,6 @@ export interface ProjectionLike {
   readonly values?:
     | {
         readonly userQuestions?: UserQuestionsProjectionLike | undefined
-        readonly agentTeam?:
-          | { readonly tasks?: readonly TeamTaskLike[] | undefined }
-          | undefined
       }
     | undefined
 }
@@ -89,33 +95,17 @@ export interface SessionsFace {
 }
 
 /**
- * Whether a session's team board holds a task that is both ready and pending —
- * a decision only the Lead (and through it, the user) can take.
- */
-export function hasReadyPendingTeamTask(projection: ProjectionLike | undefined): boolean {
-  const tasks = projection?.values?.agentTeam?.tasks
-  if (!Array.isArray(tasks)) return false
-  return tasks.some(task => task.status === 'pending' && task.ready === true)
-}
-
-/**
  * Whether the session is blocked on a human answer.
  *
- * Both branches are real, durable projections of the installed Harness:
- *
- * - `userQuestions.active` — the `ask_user_question` tool is parked waiting for
- *   the user (including plan review, which is a question with a `plan-review`
- *   intent).
- * - `agentTeam.tasks` with `ready && pending` — a shared team task is unclaimed
- *   and unblocked, so the Lead has to decide who takes it.
- *
- * A session with neither is not "awaiting a decision", however long it has been
- * idle: idleness is not a request for the user.
+ * Only `userQuestions.active` counts. A team board's `pending` task must not:
+ * those rows are the team's work items, they stay `pending` in the log of a
+ * finished session forever, and no field marks one as waiting for the user.
+ * Treating them as decisions was the defect that pinned a six-day-old completed
+ * session to the decision board.
  */
 export function isAwaitingDecision(projection: ProjectionLike | undefined): boolean {
   const active = projection?.values?.userQuestions?.active
-  if (Array.isArray(active) && active.length > 0) return true
-  return hasReadyPendingTeamTask(projection)
+  return Array.isArray(active) && active.length > 0
 }
 
 /** Whether a summary describes a subagent child rather than a top-level session. */
