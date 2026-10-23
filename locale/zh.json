@@ -41,6 +41,9 @@
     "refresh": "刷新看板",
     "filter": "筛选会话"
   },
+  "detail": {
+    "label": "看板："
+  },
   "a11y": {
     "panel": "会话状态看板面板",
     "running": "执行中",

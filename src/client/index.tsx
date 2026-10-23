@@ -27,8 +27,9 @@
  */
 
 import { createElement, type ReactElement } from 'react'
-import { LOCALE_NAMESPACE } from '../shared/i18n.ts'
-import { BoardPanel } from './Panel.tsx'
+import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
+import { BoardGlyph, BoardPanel } from './Panel.tsx'
+import { SessionRowDetail, SessionRowMark } from './Sidebar.tsx'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
@@ -162,17 +163,41 @@ export function apply(ctx: ClientContext): void {
   }
 
   // ── Slots ─────────────────────────────────────────────────────────────────
-  // The module REPLACES the shipped workspace browser, which is the point: the
-  // spec asks for the left list itself to be the three boards. `sidebar.workspaces`
-  // is a single slot, so registering here shadows the shipped occupant rather
-  // than sitting beside it — which is why the module reimplements the two
-  // capabilities that browser provided and this plugin still needs: opening a
-  // session (below) and filtering the list (in the view's search box).
+  // The status itself lives in the sidebar, on every Session row: that is where
+  // the user looks, and the row seats are the only additive surfaces the sidebar
+  // offers a plugin (`replaceRisk: none`). The full board stays reachable from
+  // the panel icon for the grouped view.
+  //
+  // `sidebar.workspaces` is deliberately NOT used: its catalog says "declaring
+  // is claiming" and the shipped `sidebar` entry claims it for the workspace
+  // browser, so a module cannot be inserted there — and shadowing it would
+  // delete the workspace list, its search box, and the new-session control.
+  const RowMark = (props: { sessionId: string }): ReactElement =>
+    createElement(SessionRowMark, { sessionId: props.sessionId, store })
+  const RowDetail = (props: { sessionId: string }): ReactElement =>
+    createElement(SessionRowDetail, { sessionId: props.sessionId, store })
   const BoardComponent = (): ReactElement => createElement(BoardPanel, { store, resolveNavigation })
 
-  // `id` is the claimant key: a single slot tracks which registration owns it, so
-  // an unnamed registration can succeed while the shipped occupant stays put.
-  ctx.slots.inject('sidebar.workspaces', () =>
-    ctx.slots.register({ name: 'sidebar.workspaces', id: 'status-board' }, BoardComponent),
+  ctx.slots.inject('sidebar.session.row.leading', () =>
+    ctx.slots.register({ name: 'sidebar.session.row.leading', id: 'status-board', order: 20 }, RowMark),
   )
+
+  ctx.slots.inject('sidebar.session.row.hover', () =>
+    ctx.slots.register({ name: 'sidebar.session.row.hover', id: 'status-board', order: 20 }, RowDetail),
+  )
+
+  ctx.slots.inject('sidebar.panellist', () =>
+    ctx.slots.register(
+      {
+        name: 'sidebar.panellist',
+        id: 'status-board',
+        order: 20,
+        // A thunk, so the nav row follows a language switch without re-registering.
+        label: () => createTranslate(ctx.locale.getSnapshot().active)('panel.title'),
+      },
+      ({ size }: { size: number }) => createElement(BoardGlyph, { size }),
+    ),
+  )
+
+  ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'status-board' }, BoardComponent))
 }

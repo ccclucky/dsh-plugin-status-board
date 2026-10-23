@@ -41,6 +41,9 @@
     "refresh": "Refresh board",
     "filter": "Filter sessions"
   },
+  "detail": {
+    "label": "Board:"
+  },
   "a11y": {
     "panel": "Session status board panel",
     "running": "Running",

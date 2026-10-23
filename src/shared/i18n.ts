@@ -53,6 +53,10 @@ export interface LocaleFile {
     /** Placeholder and accessible label of the sidebar filter box. */
     readonly filter: string
   }
+  readonly detail: {
+    /** Label of the hover-card section naming a session's board. */
+    readonly label: string
+  }
   readonly a11y: {
     readonly panel: string
     readonly running: string
@@ -69,6 +73,7 @@ export type MessageKey =
   | `summary.${keyof LocaleFile['summary']}`
   | `time.${keyof LocaleFile['time']}`
   | `action.${keyof LocaleFile['action']}`
+  | `detail.${keyof LocaleFile['detail']}`
   | `a11y.${keyof LocaleFile['a11y']}`
   | `panel.${keyof LocaleFile['panel']}`
 

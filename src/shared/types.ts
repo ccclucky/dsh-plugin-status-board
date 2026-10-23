@@ -32,14 +32,19 @@ export interface SessionSignal {
   /**
    * Whether the Session is blocked on a decision only the user can make.
    *
-   * Derived from the Session's own projections — a parked `userQuestions` entry
-   * (the `ask_user_question` tool waiting for a human answer, plan review
-   * included) or a ready, unclaimed team task. Such a Session outranks
-   * `running`: work cannot continue until the user acts.
+   * Derived from the Session's `userQuestions` projection: a parked
+   * `ask_user_question` entry, i.e. the tool waiting for a human answer (plan
+   * review included). Such a Session outranks `running` — work cannot continue
+   * until the user acts.
    *
-   * Note what is deliberately NOT here: a pending *approval* is rendered by the
-   * Conversation's own approval UI and is not published as a session-list
-   * projection, so no field of this shape can see it.
+   * Two things are deliberately NOT here:
+   *
+   * - A pending *approval*: the Conversation's own approval UI renders it and it
+   *   is not published as a session-list projection, so no field of this shape
+   *   can see it.
+   * - A `pending` team task: measured on disk, a team board keeps its task rows
+   *   `pending` forever after a ticket ends (`ready` is absent from the wire),
+   *   so keying on it pinned finished sessions to the decision board.
    */
   readonly awaitingDecision: boolean
   /**
