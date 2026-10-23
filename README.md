@@ -54,7 +54,7 @@
 
 1. 打开 DSH Web UI → **Settings → Plugins**。
 2. 选择 **Install bundle**，填入本包的**绝对路径**（本地目录安装）或包名（已发布到 npm 时）。
-3. 安装完成后刷新页面，侧栏导航区（「自动化任务」下方）会出现**会话状态看板**一行，后面跟着三个计数（待决策 · 执行中 · 近期）。点击该行即在侧栏右侧弹出看板；按 `Esc`、点面板外或点面板右上角 × 均可收起。
+3. 安装完成后刷新页面，侧栏导航区（「自动化任务」下方）会出现**会话状态看板**一行，行右侧带三个彩色圆点计数（待决策 · 执行中 · 近期；计数本身为深色文字，空板退灰）。点击该行即在侧栏右侧弹出看板；按 `Esc`、点面板外或点面板右上角 × 均可收起。
 
 ### 方式二：命令行（从 npm 安装，推荐脚本化场景）
 
@@ -155,7 +155,7 @@ lib/
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit，strict + exactOptionalPropertyTypes
-pnpm test        # vitest，182 个用例
+pnpm test        # vitest，184 个用例
 pnpm build       # 清理 → 声明文件 → 两半部打包 → Client 信封包装 → 产物自检
 pnpm verify      # 只跑构建产物自检（需先 build）
 pnpm test:watch  # 监听模式
@@ -181,7 +181,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # 运行时快照 → 分类输入的唯一适配点
 │       └── styles.ts            # 主题令牌驱动的样式
 ├── locale/{zh,en}.json          # 界面文案 + 插件管理页元数据
-├── tests/                       # 182 个单元测试
+├── tests/                       # 184 个单元测试
 ├── scripts/                     # 清理与 Client 信封包装
 ├── cordis.patch.yml             # bundle 补丁（含默认配置）
 └── tsdown.config.ts             # 两半部独立构建
@@ -197,7 +197,7 @@ dsh-plugin-status-board/
 | `session-source.test.ts` | 运行时快照适配、子会话/空白会话过滤、决策投影读取、异常行容错 |
 | `store.test.ts` | 订阅通知、变更检测、折叠持久化、配置晚到不覆盖用户选择、卸载语义 |
 | `panel.test.tsx` | 服务端渲染：三看板、折叠、aria 关系可解析、加载/空/错误态、主题令牌 |
-| `overlay.test.tsx` | 浮层开关、Esc/外部点击收起、焦点进入面板、控制器通知语义 |
+| `overlay.test.tsx` | 浮层开关、Esc/外部点击收起、焦点进入面板、导航行彩色读数徽标、控制器通知语义 |
 | `nav-entry.test.tsx` | 导航行拦截点击（不触发跳转）、计数描述、卸载后还原框架行为 |
 | `host.test.ts` | 配置路由 GET/HEAD/405、Allow 头、effect 清理、webServer 延迟挂载 |
 | `manifest.test.ts` | 清单/补丁/locale/图标/MIT/LICENSE 一致性 |

@@ -7,9 +7,18 @@
  * flush lists, not cards.
  *
  * State colour is the only colour in the file and it always comes from a theme
- * token (`--dsw-alias-state-*`, `--dsw-alias-brand-primary`), so light/dark
- * switching is automatic. Tints are derived with `color-mix` instead of
- * hardcoded rgba, which keeps the token-only rule testable.
+ * token (`--dsw-alias-*`), so light/dark switching is automatic. Tints are
+ * derived with `color-mix` instead of hardcoded rgba, which keeps the
+ * token-only rule testable.
+ *
+ * Token NAMES are not evidence of what they paint. Read out of the shipped
+ * theme: `brand-primary` is `#0f1115` (near-black, not an accent) and
+ * `state-idle-primary` is `#d4d4d4` (invisible on a white sidebar), so keying
+ * the three boards off them produced a black dot, a second black dot and a dot
+ * that was not there. The accents used are the ones that actually resolve to
+ * three distinguishable states in both themes: `state-warn-label` (amber),
+ * `state-business-primary` (the product blue) and `label-tertiary` (grey).
+ * Verify a token's resolved value before depending on its meaning.
  *
  * The CSS is a string rendered inside the component on purpose: the `<style>`
  * element unmounts with it, so no global stylesheet can outlive the plugin (the
@@ -65,7 +74,7 @@ export const PANEL_CSS = String.raw`
   width: 100%;
   margin: 0 0 8px;
   padding: 5px 9px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 7px;
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
@@ -84,9 +93,9 @@ export const PANEL_CSS = String.raw`
 
 .status-board__filter:focus-visible {
   outline: none;
-  border-color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-state-business-primary);
   background: var(--dsw-alias-bg-layer-1);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
 
 /* ── Scroll body ─────────────────────────────────────────────────────────── */
@@ -111,20 +120,26 @@ export const PANEL_CSS = String.raw`
   font-size: 11.5px;
 }
 
-/* ── Section ─────────────────────────────────────────────────────────────── */
+/* ── Section ────────────────────────────────────────────────────────────── */
 
+/* Which token means what is resolved from the shipped theme, not assumed: see
+   the module doc above for the two names that mislead (brand-primary paints
+   near-black; state-idle-primary is a grey that vanishes on a white sidebar).
+   The accents below are the ones that read as three distinct states in both
+   themes — amber for a decision, the product blue for work in flight, mid-grey
+   for history. */
 .status-board__card {
   /* Each board owns an accent; everything inside reads it, so one declaration
      per board colours its count pill, its rows' dots, and its rule. */
-  --sb-accent: var(--dsw-alias-state-idle-primary);
+  --sb-accent: var(--dsw-alias-label-tertiary);
 }
 
 .status-board__card[data-bucket="decision"] {
-  --sb-accent: var(--dsw-alias-state-warn-primary);
+  --sb-accent: var(--dsw-alias-state-warn-label);
 }
 
 .status-board__card[data-bucket="executing"] {
-  --sb-accent: var(--dsw-alias-brand-primary);
+  --sb-accent: var(--dsw-alias-state-business-primary);
 }
 
 .status-board__heading {
@@ -161,7 +176,7 @@ export const PANEL_CSS = String.raw`
 }
 
 .status-board__toggle:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 
@@ -195,13 +210,21 @@ export const PANEL_CSS = String.raw`
   white-space: nowrap;
 }
 
-/* Small header count. Muted on purpose: it is a tally, not a call to action. */
+/* Small header count. It carries no colour of its own — the reference keeps
+   every tally in the text colour, so the numbers read as data rather than as
+   three competing statuses. Only the decision board tints its tally, because
+   that is the one number the user has to act on (and the one that also gets
+   the large readout below). */
 .status-board__count {
   flex: 0 0 auto;
-  color: var(--sb-accent);
+  color: var(--dsw-alias-label-primary);
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.status-board__card[data-bucket="decision"] .status-board__count {
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 /* The decision board's readout: number at reading size, unit at caption size,
@@ -280,7 +303,7 @@ button.status-board__row:active {
 }
 
 .status-board__row:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 
@@ -346,7 +369,9 @@ button.status-board__row:active {
 }
 
 .status-board__nav-glyph[data-open="true"] {
-  color: var(--dsw-alias-brand-primary);
+  /* The product blue, not brand-primary: in this theme brand-primary resolves
+     to near-black, which would leave an "active" row indistinguishable. */
+  color: var(--dsw-alias-state-business-primary);
 }
 
 /* ── Nav-row readout badge ───────────────────────────────────────────────── */
@@ -366,8 +391,8 @@ button.status-board__row:active {
 
 /* The three counts, pinned to the right of the nav row. Colour lives on the dot
    alone: the number keeps the row's own text colour, so the group reads as one
-   instrument instead of three competing warnings. A zero recedes to idle grey —
-   an empty board has nothing to ask for. */
+   instrument instead of three competing warnings. The dot colours are the same
+   three accents the boards use, so a count in the rail and its board agree. */
 .status-board__metric {
   display: inline-flex;
   gap: 4px;
@@ -382,27 +407,28 @@ button.status-board__row:active {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--dsw-alias-state-idle-primary);
+  background: var(--dsw-alias-label-tertiary);
 }
 
 .status-board__metric[data-metric="decision"] .status-board__metric-dot {
-  background: var(--dsw-alias-state-warn-primary);
+  background: var(--dsw-alias-state-warn-label);
 }
 
 .status-board__metric[data-metric="executing"] .status-board__metric-dot {
-  background: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-state-business-primary);
 }
 
 .status-board__metric[data-metric="recent"] .status-board__metric-dot {
-  background: var(--dsw-alias-state-idle-primary);
+  background: var(--dsw-alias-label-tertiary);
 }
 
+/* A zero is dimmed rather than hidden: it still says the board is empty. */
 .status-board__metric[data-empty="true"] {
   color: var(--dsw-alias-label-secondary);
 }
 
 .status-board__metric[data-empty="true"] .status-board__metric-dot {
-  background: var(--dsw-alias-state-idle-primary);
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 45%, transparent);
 }
 
 /* ── Floating board ──────────────────────────────────────────────────────── */
@@ -432,7 +458,7 @@ button.status-board__row:active {
      grows past the viewport. */
   max-height: calc(100vh - 96px);
   overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   /* Opaque on purpose: a translucent board over a conversation is unreadable. */
   background: var(--dsw-alias-bg-layer-1);
@@ -442,7 +468,7 @@ button.status-board__row:active {
 }
 
 .status-board__overlay:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 
@@ -498,7 +524,7 @@ button.status-board__row:active {
 }
 
 .status-board__overlay-close:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: -2px;
 }
 

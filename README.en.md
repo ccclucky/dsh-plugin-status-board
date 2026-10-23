@@ -54,7 +54,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 1. Open the DSH Web UI → **Settings → Plugins**.
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
-3. Reload the page. A **Session Status Board** row appears in the sidebar nav list, right under the shipped rows, followed by three counts (decision · running · recent). Click the row and the board opens beside it; press `Esc`, click outside the panel, or use its × to dismiss.
+3. Reload the page. A **Session Status Board** row appears in the sidebar nav list, right under the shipped rows, with three coloured dot counts at its right edge (decision · running · recent; the figures themselves stay in the text colour, and an empty board dims to grey). Click the row and the board opens beside it; press `Esc`, click outside the panel, or use its × to dismiss.
 
 ### Option 2 — CLI, from npm (recommended for scripted setups)
 
@@ -155,7 +155,7 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 182 cases
+pnpm test        # vitest, 184 cases
 pnpm build       # clean → declarations → both halves → Client envelope wrap → self-check
 pnpm verify      # artefact self-check only (run pnpm build first)
 pnpm test:watch  # watch mode
@@ -181,7 +181,7 @@ dsh-plugin-status-board/
 │       ├── session-source.ts    # the single runtime-snapshot adapter
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 182 unit tests
+├── tests/                       # 184 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.ts             # two independent builds

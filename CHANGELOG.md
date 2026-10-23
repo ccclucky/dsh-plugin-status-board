@@ -4,6 +4,47 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-10-23
+
+### Fixed
+
+- **The three counts rendered as two black dots and one invisible dot.** The
+  boards and the nav-row readout keyed their state colour on
+  `--dsw-alias-brand-primary` and `--dsw-alias-state-idle-primary`. A token's
+  name is not its value: resolved against the shipped theme, `brand-primary` is
+  near-black and `idle-primary` is a grey that disappears on a white sidebar.
+  The accents now use the three tokens that actually resolve to distinguishable
+  states in **both** themes — `state-warn-label` (amber, a decision),
+  `state-business-primary` (the product blue, work in flight) and
+  `label-tertiary` (mid-grey, history) — and the readout's numbers stay in the
+  row's own text colour so the dots do the signalling.
+- **The floating panel never appeared in the running app.** It is styled by the
+  board's stylesheet, which only mounted with the panel, so the closed state had
+  an unstyled — and therefore invisible — readout. The stylesheet now mounts with
+  the overlay entry itself.
+- **The panel anchored to a stale position.** The nav row is marked by a sibling
+  slot registration whose effect can run after the overlay's, so the first
+  measurement found nothing and gave up. Measurement now retries across frames
+  and ignores a row that has not been laid out yet.
+- The decision board's readout and the nav-row count pill shared the class name
+  `status-board__metric`, so each inherited the other's box. They are now
+  `status-board__readout` and `status-board__metric`.
+- Border and hairline steps that used `border-l1` (4% black, invisible on white)
+  moved to a visible step.
+
+### Changed
+
+- Panel rhythm follows the reference: 18px between boards, 11.5px section
+  labels, 30px rows with a 13px title, and a 24px decision figure.
+- The floating panel's bar shows the short title and a bare total; the full
+  sentence remains the number's accessible name.
+
+### Removed
+
+- The sidebar-foot strip and the collapsed-rail trigger, along with the
+  `sidebar.footer.action` registration. The nav row is the only entry, so there
+  is no second control to keep in sync.
+
 ## [0.2.0] — 2026-10-23
 
 The board moves out of the main column and into the sidebar, and the decision
