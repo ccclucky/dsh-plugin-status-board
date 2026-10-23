@@ -14,12 +14,24 @@
  * Keeping the two halves separate is required by the manifest: the Loader
  * imports `lib/index.js` with `import()`, while the browser evaluates
  * `lib/client.js` as a classic script.
+ *
+ * WHY THIS FILE IS `.mjs` AND NOT `.ts`
+ * ─────────────────────────────────────
+ * tsdown chooses how to load its config from `process.features.typescript`:
+ * on a Node that can strip types it uses the native loader, otherwise it falls
+ * back to the `unrun` package — which is only an OPTIONAL peer of tsdown, so it
+ * is not installed. A `.ts` config therefore builds on a modern Node and dies
+ * on the oldest Node this package claims to support (`engines.node: >=20`) with
+ * `Failed to import module "unrun"`, which is exactly what CI showed while a
+ * developer machine stayed green. A plain ESM config is never type-stripped, so
+ * the build no longer depends on the runner's Node major at all. The
+ * `UserConfig[]` JSDoc keeps the editor typing that the `.ts` version had.
+ *
+ * @type {import('tsdown').UserConfig[]}
  */
-import type { UserConfig } from 'tsdown'
-
 const clientExternals = ['react', 'react-dom', 'react/jsx-runtime', 'react-dom/client']
 
-const config: UserConfig[] = [
+const config = [
   {
     entry: { index: 'src/index.ts' },
     outDir: 'lib',

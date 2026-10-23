@@ -184,7 +184,7 @@ dsh-plugin-status-board/
 ├── tests/                       # 184 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
-└── tsdown.config.ts             # two independent builds
+└── tsdown.config.mjs            # two independent builds (plain ESM; see its header)
 ```
 
 ### Test coverage

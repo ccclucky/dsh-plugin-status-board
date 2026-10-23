@@ -25,9 +25,23 @@ jobs:
       # hash, which a workflow-level `version:` cannot express.
       - uses: pnpm/action-setup@v4
 
+      # Node 24: the major this package is built and released on.
+      #
+      # The build no longer depends on which Node runs it, because
+      # `tsdown.config.mjs` is plain ESM and tsdown therefore never needs a
+      # type-stripping loader. If that file is ever renamed back to `.ts`, the
+      # build starts depending on `process.features.typescript` plus an optional
+      # peer that is not installed, and CI goes red while modern machines stay
+      # green - the exact failure this repo shipped with for its first nine runs.
+      # The note at the top of tsdown.config.mjs records the mechanism.
+      #
+      # This does NOT weaken the supported runtime: `engines.node: >=20` is about
+      # the Node that hosts the plugin inside Harness, and it is asserted by the
+      # Host half being emitted with `target: node20`. 24 is simply the toolchain
+      # floor (tsdown/rolldown bindings require ^20.19 || >=22.12).
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install
@@ -39,21 +53,8 @@ jobs:
       # Build BEFORE the test step: `tests/artifacts.test.ts` asserts the built
       # artefacts and skips itself when `lib/` is absent. Running tests first
       # would let those nine contract checks pass silently by never running.
-      # DIAGNOSTIC (temporary): the job log is served from blob storage this
-      # network cannot reach, but annotations are served by api.github.com. Echo
-      # the failure tail as annotations so the real error can be read. Revert to
-      # a plain `pnpm build` once the Linux-only break is fixed.
       - name: Build (includes the loader-envelope smoke check)
-        id: build
-        continue-on-error: true
         run: pnpm build
-
-      - name: Report the build failure tail
-        if: steps.build.outcome == 'failure'
-        run: |
-          pnpm build >build.log 2>&1 || true
-          tail -n 25 build.log | sed 's/%/%25/g' | awk '{print "::error file=build::" $0}'
-          exit 1
 
       - name: Test
         run: pnpm test

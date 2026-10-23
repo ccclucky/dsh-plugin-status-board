@@ -184,7 +184,7 @@ dsh-plugin-status-board/
 ├── tests/                       # 184 个单元测试
 ├── scripts/                     # 清理与 Client 信封包装
 ├── cordis.patch.yml             # bundle 补丁（含默认配置）
-└── tsdown.config.ts             # 两半部独立构建
+└── tsdown.config.mjs            # 两半部独立构建（纯 ESM，见文件头注释）
 ```
 
 ### 测试覆盖

@@ -12,7 +12,7 @@
  *
  * `require` resolves against the browser module table (`react`,
  * `react-dom`, `react/jsx-runtime`), which is why those stay external in
- * `tsdown.config.ts`. This script is the only build step that knows the
+ * `tsdown.config.mjs`. This script is the only build step that knows the
  * envelope; everything the factory contains is ordinary bundled code.
  */
 import { readFile, writeFile, unlink } from 'node:fs/promises'
