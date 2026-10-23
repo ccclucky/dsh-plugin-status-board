@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-status-board",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Status-based session board plugin for DeepSeek Harness",
   "license": "MIT",
   "author": "CCLUCKY",

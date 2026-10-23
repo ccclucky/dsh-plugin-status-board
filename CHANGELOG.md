@@ -4,7 +4,11 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.2] — 2026-10-23
+
+No change to the shipped code: every byte of the plugin is identical to 0.2.1.
+This release exists to move publishing itself into CI, which is what makes the
+published artefacts attributable — see *Provenance* below.
 
 ### Added
 
