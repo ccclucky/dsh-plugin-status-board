@@ -1,5 +1,5 @@
-# Continuous integration: typecheck → test → build (with the post-build smoke
-# check). The three steps are deliberately separate so a red run names the stage
+# Continuous integration: typecheck → build (with the post-build smoke check) →
+# test → pack. The steps are deliberately separate so a red run names the stage
 # that broke.
 name: CI
 
@@ -19,9 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here on purpose. pnpm/action-setup refuses to run when the
+      # workflow and package.json's `packageManager` both pin a version, and
+      # `packageManager` is the single source of truth: it carries the integrity
+      # hash, which a workflow-level `version:` cannot express.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:

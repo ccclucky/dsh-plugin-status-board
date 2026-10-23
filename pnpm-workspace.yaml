@@ -1,0 +1,11 @@
+# pnpm 10 reads settings from this file, not from package.json's `pnpm` field.
+#
+# autoInstallPeers is off because the @deepseek-ai/* peers are supplied by the
+# Harness at runtime (see `dsh.client.inject` in package.json) and no source file
+# imports them. Left at the default, pnpm installs them and their whole host
+# application tree lands in the lockfile and in every CI install: measured on
+# this repo, 1273 lines -> 2418, with 83 references to `dsh-llm` alone.
+#
+# `react` and `@deepseek-ai/cordis` are unaffected: both are devDependencies, so
+# the build and tests still get them.
+autoInstallPeers: false
