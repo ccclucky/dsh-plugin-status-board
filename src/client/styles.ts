@@ -1,13 +1,15 @@
 /**
- * Sidebar module styles.
+ * Board styles.
  *
- * The module renders INSIDE the left column, where the shipped workspace
- * browser normally lives, so it must read as part of that chrome rather than as
- * a page: 13px text, 26px rows, 11px section labels, and the sidebar's own fill
- * token.
+ * Visual language borrowed from the Harness chrome rather than invented: 12–13px
+ * type, 6–8px radii, flat surfaces, one accent per state. The board is a
+ * *popover*, so it carries a raised surface and a shadow; the rows inside it are
+ * flush lists, not cards.
  *
- * Colour comes exclusively from the Harness theme tokens (`--dsw-alias-*`,
- * `--dsw-specific-sidebar-fill`), so light/dark switching is automatic.
+ * State colour is the only colour in the file and it always comes from a theme
+ * token (`--dsw-alias-state-*`, `--dsw-alias-brand-primary`), so light/dark
+ * switching is automatic. Tints are derived with `color-mix` instead of
+ * hardcoded rgba, which keeps the token-only rule testable.
  *
  * The CSS is a string rendered inside the component on purpose: the `<style>`
  * element unmounts with it, so no global stylesheet can outlive the plugin (the
@@ -15,20 +17,22 @@
  * @module dsh-plugin-status-board/client/styles
  */
 
-/** CSS injected by the module component. */
+/** CSS injected by the board component. */
 export const PANEL_CSS = String.raw`
+/* ── Surface ─────────────────────────────────────────────────────────────── */
+
 .status-board {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   min-height: 0;
   height: 100%;
-  padding: 4px 8px 8px;
+  padding: 10px 10px 12px;
   color: var(--dsw-alias-label-primary);
-  background: var(--dsw-specific-sidebar-fill);
+  background: var(--dsw-alias-bg-layer-1);
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .status-board__head {
@@ -36,68 +40,103 @@ export const PANEL_CSS = String.raw`
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 4px 6px;
+  padding: 2px 4px 8px;
 }
 
 .status-board__title {
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--dsw-alias-label-secondary);
+  letter-spacing: 0.01em;
+  color: var(--dsw-alias-label-primary);
 }
 
 .status-board__total {
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ── Filter ──────────────────────────────────────────────────────────────── */
 
 .status-board__filter {
   box-sizing: border-box;
   width: 100%;
-  margin: 0 0 6px;
-  padding: 4px 8px;
+  margin: 0 0 8px;
+  padding: 5px 9px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  background: var(--dsw-alias-bg-layer-1);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.status-board__filter::placeholder {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.status-board__filter:hover {
+  border-color: var(--dsw-alias-border-l2);
 }
 
 .status-board__filter:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: -1px;
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
 }
+
+/* ── Scroll body ─────────────────────────────────────────────────────────── */
 
 .status-board__scroll {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 14px;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .status-board__alert {
-  margin: 0 4px 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--dsw-alias-state-error-primary);
-  border-radius: 6px;
+  margin: 0 2px 8px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
   color: var(--dsw-alias-state-error-primary);
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
+/* ── Section ─────────────────────────────────────────────────────────────── */
+
 .status-board__card {
-  border-radius: 6px;
+  /* Each board owns an accent; everything inside reads it, so one declaration
+     per board colours its count pill, its rows' dots, and its rule. */
+  --sb-accent: var(--dsw-alias-state-idle-primary);
+}
+
+.status-board__card[data-bucket="decision"] {
+  --sb-accent: var(--dsw-alias-state-warn-primary);
+}
+
+.status-board__card[data-bucket="executing"] {
+  --sb-accent: var(--dsw-alias-brand-primary);
 }
 
 .status-board__heading {
   margin: 0;
   font-size: inherit;
   font-weight: inherit;
+  /* Sticky: with a long board the section you scrolled past should still say
+     what the rows under it mean. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .status-board__toggle {
@@ -105,16 +144,16 @@ export const PANEL_CSS = String.raw`
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 28px;
-  padding: 3px 6px;
+  min-height: 26px;
+  padding: 2px 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-align: left;
   cursor: pointer;
 }
@@ -131,7 +170,8 @@ export const PANEL_CSS = String.raw`
 
 .status-board__chevron {
   flex: 0 0 auto;
-  transition: transform 120ms ease;
+  opacity: 0.65;
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .status-board__chevron[data-collapsed="true"] {
@@ -149,37 +189,45 @@ export const PANEL_CSS = String.raw`
 .status-board__count {
   flex: 0 0 auto;
   min-width: 18px;
-  padding: 0 5px;
+  padding: 1px 6px;
   border-radius: 999px;
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  font-weight: 500;
+  background: color-mix(in srgb, var(--sb-accent) 14%, transparent);
+  color: var(--sb-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
   text-align: center;
 }
+
+/* ── Rows ────────────────────────────────────────────────────────────────── */
 
 .status-board__rows {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin: 0;
-  padding: 1px 0 4px 14px;
+  margin: 1px 0 0;
+  /* Indent to the section label's text edge, not to its chevron: the rows read
+     as the section's content. */
+  padding: 0 0 2px 16px;
   list-style: none;
 }
 
 .status-board__row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  box-sizing: border-box;
   width: 100%;
-  min-height: 26px;
-  padding: 3px 6px;
+  min-height: 28px;
+  padding: 4px 6px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
-  color: inherit;
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   text-align: left;
+  transition: background 100ms ease;
 }
 
 /* Only an actual button advertises itself as clickable. */
@@ -189,6 +237,10 @@ button.status-board__row {
 
 button.status-board__row:hover {
   background: var(--dsw-alias-bg-layer-2);
+}
+
+button.status-board__row:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
 }
 
 .status-board__row:focus-visible {
@@ -201,59 +253,49 @@ button.status-board__row:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--dsw-alias-state-idle-primary);
+  background: var(--sb-accent);
 }
 
-.status-board__dot[data-state="decision"] {
-  background: var(--dsw-alias-state-warn-primary);
-}
-
-.status-board__dot[data-state="executing"] {
-  background: var(--dsw-alias-brand-primary);
+/* The decision dot is the one row that may need to catch the eye from across
+   the screen, so it gets a halo; the others stay quiet. */
+.status-board__card[data-bucket="decision"] .status-board__dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-accent) 20%, transparent);
 }
 
 .status-board__row-title {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .status-board__row-meta {
   flex: 0 0 auto;
-  max-width: 45%;
-  overflow: hidden;
   color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  text-overflow: ellipsis;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+/* ── Messages ────────────────────────────────────────────────────────────── */
+
 .status-board__empty {
   margin: 0;
-  padding: 2px 6px 6px 14px;
+  padding: 3px 6px 4px 16px;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
 }
 
 .status-board__truncated {
   margin: 0;
-  padding: 0 6px 4px 14px;
+  padding: 2px 6px 2px 16px;
   color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
+  font-size: 10.5px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .status-board__chevron {
-    transition: none;
-  }
-}
-
-/* ── Floating board (option C) ─────────────────────────────────────────────
-   The trigger sits at the sidebar foot beside Settings; the board floats in the
-   frame-wide overlay layer. Both read as Harness chrome, not as an app window. */
+/* ── Sidebar-foot trigger ────────────────────────────────────────────────── */
 
 .status-board__trigger {
   position: relative;
@@ -271,6 +313,7 @@ button.status-board__row:hover {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
 }
 
 .status-board__trigger:hover {
@@ -289,16 +332,19 @@ button.status-board__row:hover {
 }
 
 .status-board__trigger-count {
-  min-width: 14px;
+  min-width: 15px;
   padding: 0 4px;
   border-radius: 999px;
   background: var(--dsw-alias-state-warn-primary);
   color: var(--dsw-alias-bg-layer-1);
   font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
   text-align: center;
 }
+
+/* ── Floating board ──────────────────────────────────────────────────────── */
 
 .status-board__overlay-root {
   position: fixed;
@@ -306,25 +352,27 @@ button.status-board__row:hover {
   left: 0;
   bottom: 0;
   display: flex;
-  align-items: stretch;
-  /* Anchored to the sidebar's width, so the board opens beside the trigger
-     rather than floating detached in the middle of the window. */
+  /* Bottom-aligned: the trigger lives at the sidebar foot, so the board opens
+     upward from it instead of appearing far away at the top of the window. */
+  align-items: flex-end;
   padding: 44px 0 44px 12px;
 }
 
 .status-board__overlay {
   display: flex;
   flex-direction: column;
-  width: 300px;
-  max-height: 100%;
+  width: 304px;
+  /* Bounded, not stretched: the panel is as tall as its content until the list
+     grows past the viewport. */
+  max-height: calc(100vh - 96px);
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 10px;
-  /* Opaque on purpose: a translucent board over a conversation is unreadable.
-     The shadow is derived from a theme token rather than a hardcoded black, so
-     it inverts correctly in dark mode and keeps the token-only colour rule. */
+  border-radius: 12px;
+  /* Opaque on purpose: a translucent board over a conversation is unreadable. */
   background: var(--dsw-alias-bg-layer-1);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 24%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
 }
 
 .status-board__overlay:focus-visible {
@@ -335,34 +383,47 @@ button.status-board__row:hover {
 .status-board__overlay-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 8px 8px 6px 12px;
+  padding: 9px 8px 9px 12px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
 .status-board__overlay-title {
-  font-size: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board__overlay-total {
+  flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
-  text-transform: uppercase;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .status-board__overlay-close {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
 }
 
 .status-board__overlay-close:hover {
@@ -381,8 +442,12 @@ button.status-board__row:hover {
   overscroll-behavior: contain;
 }
 
-/* The board inside the overlay is a panel, not a sidebar column: it already
-   sits on an opaque surface, so it drops the sidebar fill it would inherit. */
+/* Inside the overlay the bar already carries the title and the count, so the
+   board's own head would repeat both. */
+.status-board__overlay-body .status-board__head {
+  display: none;
+}
+
 .status-board__overlay-body .status-board {
   height: auto;
   background: transparent;

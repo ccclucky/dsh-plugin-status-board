@@ -178,6 +178,8 @@ export function BoardOverlay({
 
   if (!open) return null
 
+  const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
+
   return (
     <div
       className="status-board__overlay-root"
@@ -197,6 +199,7 @@ export function BoardOverlay({
       >
         <div className="status-board__overlay-bar">
           <span className="status-board__overlay-title">{translate('panel.title')}</span>
+          <span className="status-board__overlay-total">{translate('summary.total', { total })}</span>
           <button
             type="button"
             className="status-board__overlay-close"

@@ -1,0 +1,620 @@
+<!doctype html><html lang="zh"><meta charset="utf-8">
+<title>浮层看板预览</title>
+<style>
+
+:root{
+  --dsw-alias-bg-base:#ffffff;
+  --dsw-alias-bg-layer-1:#ffffff;
+  --dsw-alias-bg-layer-2:#f2f4f7;
+  --dsw-alias-bg-overlay:#ffffff;
+  --dsw-alias-border-l1:#e4e8ee;
+  --dsw-alias-border-l2:#d3dae3;
+  --dsw-alias-brand-primary:#4f46e5;
+  --dsw-alias-label-primary:#14171a;
+  --dsw-alias-label-secondary:#6b7684;
+  --dsw-alias-state-error-primary:#dc2626;
+  --dsw-alias-state-idle-primary:#9aa4b1;
+  --dsw-alias-state-success-primary:#16a34a;
+  --dsw-alias-state-warn-primary:#d97706;
+  --dsw-specific-sidebar-fill:#f7f8fa;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --dsw-alias-bg-base:#0e1116;
+    --dsw-alias-bg-layer-1:#151a21;
+    --dsw-alias-bg-layer-2:#1e242c;
+    --dsw-alias-bg-overlay:#1a2029;
+    --dsw-alias-border-l1:#242c36;
+    --dsw-alias-border-l2:#303a46;
+    --dsw-alias-brand-primary:#818cf8;
+    --dsw-alias-label-primary:#eef2f6;
+    --dsw-alias-label-secondary:#96a2b1;
+    --dsw-alias-state-error-primary:#f87171;
+    --dsw-alias-state-idle-primary:#64707e;
+    --dsw-alias-state-success-primary:#4ade80;
+    --dsw-alias-state-warn-primary:#fbbf24;
+    --dsw-specific-sidebar-fill:#11151b;
+  }
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;display:grid;grid-template-columns:280px 1fr;
+  background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
+  font:16px/1.5 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+.side{
+  background:var(--dsw-specific-sidebar-fill);border-right:1px solid var(--dsw-alias-border-l1);
+  padding:14px 10px;display:flex;flex-direction:column;gap:3px;font-size:12.5px;
+}
+.side .brand{font-weight:700;font-size:10px;letter-spacing:.08em;color:var(--dsw-alias-label-secondary);padding:2px 6px 8px}
+.side .new{border:1px solid var(--dsw-alias-border-l1);border-radius:7px;padding:7px;text-align:center;color:var(--dsw-alias-label-secondary);margin-bottom:8px}
+.side .nav{padding:6px 8px;border-radius:6px}
+.side .sect{margin-top:10px;font-weight:600;font-size:10.5px;color:var(--dsw-alias-label-secondary);padding:2px 8px;display:flex;justify-content:space-between}
+.side .r{padding:5px 8px;border-radius:6px;color:var(--dsw-alias-label-secondary);display:flex;gap:6px}
+.side .foot{margin-top:auto;display:flex;gap:6px;align-items:center;justify-content:flex-end;border-top:1px solid var(--dsw-alias-border-l1);padding-top:10px}
+.main{padding:26px 30px;color:var(--dsw-alias-label-secondary);font-size:13px}
+.stage{position:relative;height:640px;margin-top:12px;border:1px dashed var(--dsw-alias-border-l2);border-radius:10px}
+
+/* ── Surface ─────────────────────────────────────────────────────────────── */
+
+.status-board {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
+  padding: 10px 10px 12px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.status-board__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 8px;
+}
+
+.status-board__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__total {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Filter ──────────────────────────────────────────────────────────────── */
+
+.status-board__filter {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.status-board__filter::placeholder {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.status-board__filter:hover {
+  border-color: var(--dsw-alias-border-l2);
+}
+
+.status-board__filter:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent);
+}
+
+/* ── Scroll body ─────────────────────────────────────────────────────────── */
+
+.status-board__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.status-board__alert {
+  margin: 0 2px 8px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11.5px;
+}
+
+/* ── Section ─────────────────────────────────────────────────────────────── */
+
+.status-board__card {
+  /* Each board owns an accent; everything inside reads it, so one declaration
+     per board colours its count pill, its rows' dots, and its rule. */
+  --sb-accent: var(--dsw-alias-state-idle-primary);
+}
+
+.status-board__card[data-bucket="decision"] {
+  --sb-accent: var(--dsw-alias-state-warn-primary);
+}
+
+.status-board__card[data-bucket="executing"] {
+  --sb-accent: var(--dsw-alias-brand-primary);
+}
+
+.status-board__heading {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  /* Sticky: with a long board the section you scrolled past should still say
+     what the rows under it mean. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.status-board__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.status-board__toggle:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__toggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__chevron {
+  flex: 0 0 auto;
+  opacity: 0.65;
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-board__chevron[data-collapsed="true"] {
+  transform: rotate(-90deg);
+}
+
+.status-board__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board__count {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-accent) 14%, transparent);
+  color: var(--sb-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* ── Rows ────────────────────────────────────────────────────────────────── */
+
+.status-board__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 0;
+  /* Indent to the section label's text edge, not to its chevron: the rows read
+     as the section's content. */
+  padding: 0 0 2px 16px;
+  list-style: none;
+}
+
+.status-board__row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-align: left;
+  transition: background 100ms ease;
+}
+
+/* Only an actual button advertises itself as clickable. */
+button.status-board__row {
+  cursor: pointer;
+}
+
+button.status-board__row:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+button.status-board__row:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+}
+
+.status-board__row:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sb-accent);
+}
+
+/* The decision dot is the one row that may need to catch the eye from across
+   the screen, so it gets a halo; the others stay quiet. */
+.status-board__card[data-bucket="decision"] .status-board__dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-accent) 20%, transparent);
+}
+
+.status-board__row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board__row-meta {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Messages ────────────────────────────────────────────────────────────── */
+
+.status-board__empty {
+  margin: 0;
+  padding: 3px 6px 4px 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.status-board__truncated {
+  margin: 0;
+  padding: 2px 6px 2px 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10.5px;
+}
+
+/* ── Sidebar-foot trigger ────────────────────────────────────────────────── */
+
+.status-board__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.status-board__trigger:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__trigger[data-open="true"] {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.status-board__trigger-count {
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-bg-layer-1);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* ── Floating board ──────────────────────────────────────────────────────── */
+
+.status-board__overlay-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  /* Bottom-aligned: the trigger lives at the sidebar foot, so the board opens
+     upward from it instead of appearing far away at the top of the window. */
+  align-items: flex-end;
+  padding: 44px 0 44px 12px;
+}
+
+.status-board__overlay {
+  display: flex;
+  flex-direction: column;
+  width: 304px;
+  /* Bounded, not stretched: the panel is as tall as its content until the list
+     grows past the viewport. */
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  /* Opaque on purpose: a translucent board over a conversation is unreadable. */
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
+}
+
+.status-board__overlay:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__overlay-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 8px 9px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.status-board__overlay-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board__overlay-total {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.status-board__overlay-close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.status-board__overlay-close:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__overlay-close:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__overlay-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Inside the overlay the bar already carries the title and the count, so the
+   board's own head would repeat both. */
+.status-board__overlay-body .status-board__head {
+  display: none;
+}
+
+.status-board__overlay-body .status-board {
+  height: auto;
+  background: transparent;
+}
+
+/* preview-only: stand the overlay up in flow instead of fixed */
+.status-board__overlay-root{position:absolute;padding:16px}
+.status-board__overlay{box-shadow:0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 24%, transparent)}
+</style>
+<body>
+<aside class="side">
+  <div class="brand">deepseek HARNESS</div>
+  <div class="new">＋ 新会话</div>
+  <div class="nav">插件</div>
+  <div class="nav">自动化任务</div>
+  <div class="sect"><span>工作区</span><span>⌕ ⚙ ＋</span></div>
+  <div class="r">eastroc_qa_assistant</div>
+  <div class="r">[pending] RAGFlow</div>
+  <div class="r">[wip] 实现 #82 四切片</div>
+  <div class="foot"><span>⚙</span><span style="display:inline-flex;align-items:center;gap:4px;padding:0 6px;height:28px;border-radius:6px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary);font-size:11px">▦<span style="background:var(--dsw-alias-state-warn-primary);color:#fff;border-radius:999px;padding:0 4px;font-size:10px;line-height:14px">1</span></span></div>
+</aside>
+<div class="main">
+  会话区域（真实应用中这里是对话内容）
+  <div class="stage">
+    <div class="status-board__overlay-root">
+      <div class="status-board__overlay" role="dialog" aria-label="会话状态看板" tabindex="-1">
+        <div class="status-board__overlay-bar">
+          <span class="status-board__overlay-title">会话状态看板</span>
+          <span class="status-board__overlay-total">共 10 个会话</span>
+          <button type="button" class="status-board__overlay-close" aria-label="收起看板">×</button>
+        </div>
+        <div class="status-board__overlay-body">
+<div class="status-board">
+  <div class="status-board__head">
+    <h2 class="status-board__title">会话状态看板</h2>
+    <span class="status-board__total">共 10 个会话</span>
+  </div>
+  <input class="status-board__filter" type="search" placeholder="筛选会话" value="" aria-label="筛选会话">
+  <div class="status-board__scroll">
+    
+  <section class="status-board__card" data-bucket="decision">
+    <h2 class="status-board__heading">
+      <button type="button" class="status-board__toggle" aria-expanded="true" title="这些会话在等你拍板，才能继续">
+        <svg class="status-board__chevron" data-collapsed="false" viewBox="0 0 12 12" aria-hidden="true" style="width:10px;height:10px;display:block">
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="status-board__name">待我决策</span>
+        <span class="status-board__count" aria-hidden="true">1</span>
+      </button>
+    </h2>
+    <div role="group" aria-label="待我决策">
+      <ul class="status-board__rows">
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="[pending] RAGFlow 图片通道实测选型">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">[pending] RAGFlow 图片通道实测选型</span>
+          <span class="status-board__row-meta" id="m">25 分钟前</span>
+        </button>
+      </li></ul>
+    </div>
+  </section>
+    
+  <section class="status-board__card" data-bucket="executing">
+    <h2 class="status-board__heading">
+      <button type="button" class="status-board__toggle" aria-expanded="true" title="Agent 正在处理">
+        <svg class="status-board__chevron" data-collapsed="false" viewBox="0 0 12 12" aria-hidden="true" style="width:10px;height:10px;display:block">
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="status-board__name">正在执行</span>
+        <span class="status-board__count" aria-hidden="true">5</span>
+      </button>
+    </h2>
+    <div role="group" aria-label="正在执行">
+      <ul class="status-board__rows">
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="[wip] 实现 #82 四切片">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">[wip] 实现 #82 四切片</span>
+          <span class="status-board__row-meta" id="m">25 分钟前</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="advisor #58">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">advisor #58</span>
+          <span class="status-board__row-meta" id="m">1 分钟前</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="[done] 控制台交互与调型审阅">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">[done] 控制台交互与调型审阅</span>
+          <span class="status-board__row-meta" id="m">26 分钟前</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="[pending] RAGFlow 图片通道…">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">[pending] RAGFlow 图片通道…</span>
+          <span class="status-board__row-meta" id="m">25 分钟前</span>
+        </button>
+      </li>
+      <li>
+        <button type="button" class="status-board__row" data-state="recent" title="DSH 看板插件开发与全链路发布">
+          <span class="status-board__dot" data-state="recent" aria-hidden="true"></span>
+          <span class="status-board__row-title">DSH 看板插件开发与全链路发布</span>
+          <span class="status-board__row-meta" id="m">刚刚</span>
+        </button>
+      </li></ul>
+    </div>
+  </section>
+    
+  <section class="status-board__card" data-bucket="recent">
+    <h2 class="status-board__heading">
+      <button type="button" class="status-board__toggle" aria-expanded="false" title="最近 24 小时内有动静">
+        <svg class="status-board__chevron" data-collapsed="true" viewBox="0 0 12 12" aria-hidden="true" style="width:10px;height:10px;display:block">
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="status-board__name">近期记录</span>
+        <span class="status-board__count" aria-hidden="true">4</span>
+      </button>
+    </h2>
+    <div role="group" aria-label="近期记录" hidden>
+      <ul class="status-board__rows"></ul>
+    </div>
+  </section>
+  </div>
+</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
