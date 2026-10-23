@@ -39,18 +39,12 @@ an inline navigation tree, and a compact floating button opens the full board.
   rows and per-board empty copy; the board has a two-line header (title +
   session total), and a tinted question card with option marks. The floating
   entry is a labelled pill at the bottom-right instead of a bare icon square.
-- **Status marks carry state, not just colour.** A decision is a solid amber
-  dot inside a slow breathing halo (the session variant is a hollow breathing
-  ring); work in flight sweeps twice and then settles into a static blue arc
-  (the directory variant keeps a solid core); history is a static grey dot/ring. Directories are the filled,
-  stronger variant; sessions are the hollow, softer one. Motion is disabled
-  under `prefers-reduced-motion`; the text and counts remain the primary
-  signal.
-- The client now imports `react-dom` (for the tree portal); `react-dom` is
-  declared as a peer dependency.
-- The floating board is 380px wide and anchors above the floating button instead
-  of beside the nav row.
-- Locale dictionaries gained `tree.*`, `question.*` and `action.answer` keys.
+- **Status marks carry state, not just colour.** Directories are static: a
+  solid amber dot inside a halo (decision), a blue arc with a solid core
+  (executing), a grey dot/ring (history). Session rows are alive where it
+  matters: a hollow amber ring breathes on a decision, a blue arc pulses on
+  work in flight, and history stays still. Nothing rotates, and motion switches
+  off under `prefers-reduced-motion`.
 
 ### Fixed
 

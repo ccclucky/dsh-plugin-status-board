@@ -39,7 +39,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 - **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right pill opens the **full board**.
 - **The sidebar tree is navigation only** — click a session exactly like the Workspace browser; no approval or answer controls live in the tree.
-- **Status marks carry state, not just colour** — a slow breathing amber halo for decisions, a short blue sweep for work in flight that settles into a static arc, and stillness for history; directories are the filled, stronger variant, sessions the hollow one. Motion switches off under reduced-motion.
+- **Status marks carry state, not just colour** — directories are static (a filled amber dot, a blue arc, a grey dot); session rows move only when it matters (a hollow amber ring breathes for decisions, a blue arc pulses for work in flight, history stays still). Nothing rotates; motion switches off under reduced-motion.
 - **Inline question card in the floating board** — decision rows expand; `continued` questions submit in place, while `open` questions point at the session's own card.
 - **Three collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
 - **Correct precedence** — a session waiting on your decision lands on the decision board even while its agent is still running; it never drowns in "Running".

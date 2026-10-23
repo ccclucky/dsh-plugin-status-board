@@ -453,8 +453,9 @@ button.status-board__row:active {
 
 /* Directory and session markers share a hue but not a weight: the directory is
    the filled, stronger variant; the session is the hollow/soft one. The motion
-   encodes the state: a slow breath for a decision waiting on a human, a spin for
-   work in flight, stillness for history. */
+   encodes the state on session rows only: a slow breath for a decision waiting
+   on a human, a soft pulse for work in flight, stillness for history. Directory
+   markers are deliberately static; only the sessions themselves are alive. */
 .status-board-status {
   --sb-status-size: 12px;
   --sb-status: var(--dsw-alias-label-tertiary);
@@ -499,7 +500,6 @@ button.status-board__row:active {
   width: 16px;
   height: 16px;
   border: 1px solid var(--sb-status-soft);
-  animation: status-board-status-breathe 2.6s ease-in-out infinite;
 }
 
 .status-board-status[data-bucket="decision"][data-variant="row"]::before {
@@ -510,15 +510,14 @@ button.status-board__row:active {
   animation: status-board-status-breathe-soft 2.6s ease-in-out infinite;
 }
 
-/* Executing: a short sweep on appearance, then a static arc. A perpetual
-   spinner on every running row is noise; the colour and the gap still read as
-   work in flight. The directory adds a solid core, the session does not. */
+/* Executing: the directory is a static arc with a solid core; a session row is
+   a softly pulsing arc. No rotation: a board left open should not spin at the
+   user. */
 .status-board-status[data-bucket="executing"][data-variant="folder"]::before {
   width: 12px;
   height: 12px;
   border: 2px solid var(--sb-status-soft);
   border-top-color: var(--sb-status);
-  animation: status-board-status-spin 1.4s linear 2;
 }
 
 .status-board-status[data-bucket="executing"][data-variant="folder"]::after {
@@ -532,7 +531,7 @@ button.status-board__row:active {
   height: 9px;
   border: 1.5px solid var(--sb-status-soft);
   border-top-color: var(--sb-status);
-  animation: status-board-status-spin 1.4s linear 2;
+  animation: status-board-status-pulse 1.8s ease-in-out infinite;
 }
 
 /* Recent: a static dot with a faint ring (directory), a static hollow ring
@@ -556,19 +555,6 @@ button.status-board__row:active {
   background: transparent;
 }
 
-@keyframes status-board-status-breathe {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(0.86);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.06);
-  }
-}
-
 @keyframes status-board-status-breathe-soft {
   0%,
   100% {
@@ -588,9 +574,16 @@ button.status-board__row:active {
   animation: none;
 }
 
-@keyframes status-board-status-spin {
-  to {
-    transform: rotate(360deg);
+@keyframes status-board-status-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
   }
 }
 
