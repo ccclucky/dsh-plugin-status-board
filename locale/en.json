@@ -16,7 +16,10 @@
     "recentHint": "Active in the last {hours} hours",
     "empty": "No sessions",
     "expand": "Expand “{name}”: {count} sessions",
-    "collapse": "Collapse “{name}”: {count} sessions"
+    "collapse": "Collapse “{name}”: {count} sessions",
+    "decisionUnit": "waiting on you",
+    "executingUnit": "running",
+    "recentUnit": "recent"
   },
   "state": {
     "loading": "Reading sessions…",

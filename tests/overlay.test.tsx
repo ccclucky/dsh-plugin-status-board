@@ -123,20 +123,32 @@ describe('BoardTrigger', () => {
     expect(button?.getAttribute('aria-controls')).toBeTruthy()
   })
 
-  it('shows the decision count and names it in the label', () => {
-    const store = makeStore([signal('a', { awaitingDecision: true }), signal('b', { awaitingDecision: true })])
+  it('reads out all three counts in the wide sidebar', () => {
+    const store = makeStore([
+      signal('a', { awaitingDecision: true }),
+      signal('b', { running: true }),
+      signal('c', { running: true }),
+      signal('d', {}),
+    ])
     const controller = createOverlayController()
     const container = mount(createElement(BoardTrigger, { controller, store, wide: true }))
-    expect(container.textContent).toContain('2')
-    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Needs my decision')
+    // Option A: the entry is a readout, so every non-empty board contributes a
+    // metric — the point is knowing the state without opening the panel.
+    expect(container.querySelectorAll('.status-board__metric')).toHaveLength(3)
+    expect(container.querySelector('[data-metric="decision"]')?.textContent).toBe('1')
+    expect(container.querySelector('[data-metric="executing"]')?.textContent).toBe('2')
+    // The counts are stated once, in the trigger's accessible name.
+    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Needs my decision 1')
   })
 
-  it('drops the count in the 56px rail', () => {
-    // The rail has no room for a badge; overflowing it would break the column.
-    const store = makeStore([signal('a', { awaitingDecision: true })])
+  it('collapses to the glyph plus the decision count in the 56px rail', () => {
+    // The rail has no room for a strip; overflowing it would break the column.
+    // The decision count is the one number worth keeping.
+    const store = makeStore([signal('a', { awaitingDecision: true }), signal('b', { running: true })])
     const controller = createOverlayController()
     const container = mount(createElement(BoardTrigger, { controller, store, wide: false }))
-    expect(container.querySelector('.status-board__trigger-count')).toBeNull()
+    expect(container.querySelector('.status-board__strip')).toBeNull()
+    expect(container.querySelector('.status-board__trigger-count')?.textContent).toBe('1')
   })
 })
 

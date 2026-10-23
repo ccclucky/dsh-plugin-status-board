@@ -16,7 +16,10 @@
     "recentHint": "最近 {hours} 小时内有动静",
     "empty": "暂无会话",
     "expand": "展开「{name}」（{count} 个会话）",
-    "collapse": "收起「{name}」（{count} 个会话）"
+    "collapse": "收起「{name}」（{count} 个会话）",
+    "decisionUnit": "件事等你拍板",
+    "executingUnit": "个正在跑",
+    "recentUnit": "条近期记录"
   },
   "state": {
     "loading": "正在读取会话…",

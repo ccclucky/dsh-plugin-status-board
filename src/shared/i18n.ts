@@ -30,6 +30,10 @@ export interface LocaleFile {
     readonly empty: string
     readonly expand: string
     readonly collapse: string
+    /** Noun phrase that turns a board's count into a readout, e.g. "waiting on you". */
+    readonly decisionUnit: string
+    readonly executingUnit: string
+    readonly recentUnit: string
   }
   readonly state: {
     readonly loading: string

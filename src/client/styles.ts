@@ -141,19 +141,15 @@ export const PANEL_CSS = String.raw`
 
 .status-board__toggle {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 8px;
   width: 100%;
-  min-height: 26px;
-  padding: 2px 6px;
+  padding: 4px 6px 5px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
   text-align: left;
   cursor: pointer;
 }
@@ -179,25 +175,49 @@ export const PANEL_CSS = String.raw`
 }
 
 .status-board__name {
-  flex: 1 1 auto;
+  display: flex;
+  flex: 0 1 auto;
+  gap: 5px;
+  align-items: center;
   min-width: 0;
   overflow: hidden;
+}
+
+.status-board__name-text {
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status-board__count {
-  flex: 0 0 auto;
-  min-width: 18px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sb-accent) 14%, transparent);
+/* The readout: number at reading size, unit at caption size, baseline-aligned.
+   This is the one place the board spends size on emphasis. */
+.status-board__readout {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 4px;
+  align-items: baseline;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.status-board__readout-n {
   color: var(--sb-accent);
-  font-size: 10.5px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  line-height: 15px;
-  text-align: center;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.status-board__readout-u {
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Rows ────────────────────────────────────────────────────────────────── */
@@ -295,8 +315,100 @@ button.status-board__row:active {
   font-size: 10.5px;
 }
 
-/* ── Sidebar-foot trigger ────────────────────────────────────────────────── */
+/* ── Sidebar-foot readout ────────────────────────────────────────────────── */
 
+/* Option A: the entry is an instrument, not an icon. It sits in the sidebar foot
+   and shows the three counts, so the numbers are readable without opening the
+   panel. The whole strip is one button. */
+.status-board__strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.status-board__strip:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  border-color: var(--dsw-alias-border-l2);
+}
+
+.status-board__strip:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+/* Open state reads as "this is the panel's trigger", not as a second hover. */
+.status-board__strip[data-open="true"] {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.status-board__strip-label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.status-board__strip-text {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board__strip-metrics {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.status-board__metric {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-board__metric-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-idle-primary);
+}
+
+.status-board__metric[data-metric="decision"] .status-board__metric-dot {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.status-board__metric[data-metric="decision"] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.status-board__metric[data-metric="executing"] .status-board__metric-dot {
+  background: var(--dsw-alias-brand-primary);
+}
+
+/* Compact form, used only when the sidebar is collapsed to its rail. */
 .status-board__trigger {
   position: relative;
   display: inline-flex;

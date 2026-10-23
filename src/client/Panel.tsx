@@ -203,6 +203,7 @@ function Bucket({
   const count = visible.length
   const name = translate(`bucket.${id}` as MessageKey)
   const hint = translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
+  const unit = translate(`bucket.${id}Unit` as MessageKey)
   const filtering = query.trim().length > 0
 
   // While filtering, a board with no match is noise: the user asked a question
@@ -226,10 +227,17 @@ function Bucket({
           title={hint}
           onClick={() => store.toggle(id)}
         >
-          <Chevron collapsed={collapsed} />
-          <span className="status-board__name">{name}</span>
-          <span className="status-board__count" aria-hidden="true">
-            {count}
+          <span className="status-board__name">
+            <Chevron collapsed={collapsed} />
+            <span className="status-board__name-text">{name}</span>
+          </span>
+          {/* The count is the readout, so it is drawn at reading size with its
+              unit rather than as a pill: "1 waiting on you" is a sentence, a
+              badge is a decoration. Hidden from AT because the toggle's
+              accessible name already states the number. */}
+          <span className="status-board__readout" aria-hidden="true">
+            <span className="status-board__readout-n">{count}</span>
+            <span className="status-board__readout-u">{unit}</span>
           </span>
         </button>
       </h2>

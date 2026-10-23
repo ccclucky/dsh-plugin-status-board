@@ -35,4 +35,6 @@ pnpm-debug.log*
 
 # Local scratch
 .tmp/
-scratch/.preview*
+scratch/
+# Visual self-check output (styles/preview renders); never part of the package.
+.preview*

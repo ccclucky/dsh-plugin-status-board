@@ -11,6 +11,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { PANEL_CSS } from '../src/client/styles.ts'
 
 const hostPath = new URL('../lib/index.js', import.meta.url)
 const clientPath = new URL('../lib/client.js', import.meta.url)
@@ -82,14 +83,16 @@ describe('built artifacts', () => {
     expect(client).toContain('status-board')
   })
 
-  it('keeps the panel stylesheet byte-identical to the declared source', () => {
+  it('ships the panel stylesheet byte-identical to the declared source', () => {
     // The envelope wrapper used to re-indent the bundle body, which silently
-    // rewrote this string literal. Compare distinctive slices instead of the
-    // whole file so unrelated minification changes do not break the check.
+    // rewrote this string literal (it corrupted a CSS comment once). Compare the
+    // whole literal against the source of truth rather than a sample selector,
+    // so the check survives any redesign and still fails on a rewrite.
     const client = readFileSync(clientPath, 'utf8')
-    expect(client).toContain('.status-board__dot[data-state="decision"]')
-    expect(client).toContain('background: var(--dsw-specific-sidebar-fill)')
-    // The sidebar module must not regress to the old multi-column page grid.
-    expect(client).not.toContain('grid-template-columns: repeat(auto-fit, minmax(260px, 1fr))')
+    expect(client).toContain(PANEL_CSS)
+    // Colour must stay token-driven: no raw hex or rgba in the stylesheet.
+    expect(PANEL_CSS).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+    expect(PANEL_CSS).not.toMatch(/rgba?\(/)
+    expect(PANEL_CSS).toContain('var(--dsw-alias-')
   })
 })

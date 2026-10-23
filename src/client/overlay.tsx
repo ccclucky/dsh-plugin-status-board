@@ -67,19 +67,17 @@ export function createOverlayController(): OverlayController {
   }
 }
 
-/** Count of sessions on the decision board, for the trigger's badge. */
-function decisionCount(store: BoardStore): number {
-  const state = store.getSnapshot()
-  const board = state.board.buckets.find(candidate => candidate.id === 'decision')
-  return board === undefined ? 0 : board.entries.length
-}
-
 /**
- * The sidebar-foot trigger.
+ * The sidebar-foot readout.
  *
- * Renders its own `<button>`: the slot supplies only `wide` (the sidebar's
- * column state), not a click handler. In the 56px rail there is no room for a
- * count, so the badge is dropped rather than allowed to overflow.
+ * A three-count strip, not an icon: the sidebar foot is the one seat this plugin
+ * can put a real control in, so it carries the numbers that answer "what is
+ * going on" without being opened. The shipped nav rows are framework-rendered
+ * buttons that switch the main column, so a trigger there could not open a
+ * floating panel.
+ *
+ * Degrades in the 56px rail to the glyph plus the decision count, which is the
+ * only number worth keeping when there is no room for a row.
  */
 export function BoardTrigger({
   controller,
@@ -93,27 +91,87 @@ export function BoardTrigger({
   const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
-  const count = decisionCount(store)
   const panelId = `status-board-overlay-${useId()}`
   const label = translate('panel.title')
+
+  // Three counts rather than one badge: the strip is a readout, so it answers
+  // "what is going on" without being opened. Counted from the same board the
+  // panel renders, so the two can never disagree.
+  const countOf = (id: 'decision' | 'executing' | 'recent'): number => {
+    const board = state.board.buckets.find(candidate => candidate.id === id)
+    return board === undefined ? 0 : board.entries.length
+  }
+  const decision = countOf('decision')
+  const executing = countOf('executing')
+  const recent = countOf('recent')
+  const total = decision + executing + recent
+
+  const aria = [
+    label,
+    `${translate('bucket.decision')} ${decision}`,
+    `${translate('bucket.executing')} ${executing}`,
+    `${translate('bucket.recent')} ${recent}`,
+  ].join('，')
+
+  // The rail is 56px wide: there is no room for a label, so it degrades to the
+  // glyph plus the decision count, which is the one number worth keeping.
+  if (!wide) {
+    return (
+      <button
+        type="button"
+        className="status-board__trigger"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={aria}
+        title={aria}
+        data-open={open}
+        onClick={() => controller.toggle()}
+      >
+        <BoardGlyph size={16} />
+        {decision > 0 ? (
+          <span className="status-board__trigger-count" aria-hidden="true">
+            {decision}
+          </span>
+        ) : null}
+      </button>
+    )
+  }
 
   return (
     <button
       type="button"
-      className="status-board__trigger"
+      className="status-board__strip"
       aria-expanded={open}
       aria-controls={panelId}
-      aria-label={count > 0 ? `${label}（${translate('bucket.decision')}: ${count}）` : label}
-      title={label}
+      aria-label={aria}
+      title={aria}
       data-open={open}
       onClick={() => controller.toggle()}
     >
-      <BoardGlyph size={16} />
-      {wide && count > 0 ? (
-        <span className="status-board__trigger-count" aria-hidden="true">
-          {count}
-        </span>
-      ) : null}
+      <span className="status-board__strip-label">
+        <BoardGlyph size={14} />
+        <span className="status-board__strip-text">{label}</span>
+      </span>
+      <span className="status-board__strip-metrics" aria-hidden="true">
+        {decision > 0 ? (
+          <span className="status-board__metric" data-metric="decision">
+            <span className="status-board__metric-dot" />
+            {decision}
+          </span>
+        ) : null}
+        {executing > 0 ? (
+          <span className="status-board__metric" data-metric="executing">
+            <span className="status-board__metric-dot" />
+            {executing}
+          </span>
+        ) : null}
+        {recent > 0 || total === 0 ? (
+          <span className="status-board__metric" data-metric="recent">
+            <span className="status-board__metric-dot" />
+            {recent}
+          </span>
+        ) : null}
+      </span>
     </button>
   )
 }

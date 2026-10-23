@@ -127,9 +127,14 @@ describe('BoardPanel', () => {
     expect(store.getSnapshot().board.counts.decision).toBe(1)
   })
 
-  it('shows the row count on every board header', async () => {
+  it('shows each board count as a readout with its unit', async () => {
     const markup = await render([row('e1', 'One', { running: true }), row('e2', 'Two', { running: true })])
-    expect(markup).toMatch(/status-board__count[^>]*>2</)
+    // The count is not a bare badge: it reads as "2 running", so the number and
+    // the unit are separate nodes sharing the readout.
+    expect(markup).toMatch(/status-board__readout-n[^>]*>2</)
+    expect(markup).toContain('status-board__readout-u')
+    // Stated once for assistive technology: the toggle's accessible name.
+    expect(markup.match(/aria-label="Expand[^"]*2 sessions"/) ?? markup.match(/aria-label="Collapse[^"]*2 sessions"/)).toBeTruthy()
   })
 
   it('exposes a disclosure button with a resolvable aria-controls on each board', async () => {
