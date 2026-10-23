@@ -186,7 +186,9 @@ describe('BoardPanel', () => {
 
   it('renders an explicit empty state instead of a blank board', async () => {
     const markup = await render([])
-    expect(markup).toContain('No sessions')
+    expect(markup).toContain('Nothing waiting on you')
+    expect(markup).toContain('Nothing running')
+    expect(markup).toContain('No recent activity')
   })
 
   it('reports loading distinctly from empty, and never shows both', async () => {
@@ -195,7 +197,7 @@ describe('BoardPanel', () => {
     expect(markup).not.toContain('No sessions to show yet')
     // The per-board empty state must not contradict the panel-level loading
     // line: "no sessions" is not a fact until enumeration has settled.
-    expect(markup).not.toContain('>No sessions<')
+    expect(markup).not.toContain('Nothing waiting on you')
   })
 
   it('renders rows as buttons only when opening a session is wired', async () => {

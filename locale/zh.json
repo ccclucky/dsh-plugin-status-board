@@ -20,7 +20,10 @@
     "collapse": "收起「{name}」（{count} 个会话）",
     "decisionUnit": "件事等你拍板",
     "executingUnit": "个正在跑",
-    "recentUnit": "条近期记录"
+    "recentUnit": "条近期记录",
+    "decisionEmpty": "没有等你拍板的事",
+    "executingEmpty": "没有正在执行的会话",
+    "recentEmpty": "近期没有动静"
   },
   "state": {
     "loading": "正在读取会话…",

@@ -35,6 +35,17 @@ an inline navigation tree, and a compact floating button opens the full board.
 
 - The sidebar row no longer opens the floating board; it toggles the tree. The
   old row badge/measurement code and the overlay's row anchoring are removed.
+- **Visual pass.** The tree is a tonal folder panel with single-line session
+  rows and per-board empty copy; the board has a two-line header (title +
+  session total), and a tinted question card with option marks. The floating
+  entry is a labelled pill at the bottom-right instead of a bare icon square.
+- **Status marks carry state, not just colour.** A decision is a solid amber
+  dot inside a slow breathing halo (the session variant is a hollow breathing
+  ring); work in flight is a spinning blue arc (the directory variant keeps a
+  solid core); history is a static grey dot/ring. Directories are the filled,
+  stronger variant; sessions are the hollow, softer one. Motion is disabled
+  under `prefers-reduced-motion`; the text and counts remain the primary
+  signal.
 - The client now imports `react-dom` (for the tree portal); `react-dom` is
   declared as a peer dependency.
 - The floating board is 380px wide and anchors above the floating button instead
@@ -43,6 +54,14 @@ an inline navigation tree, and a compact floating button opens the full board.
 
 ### Fixed
 
+- **The new overlay crashed on first render and took the whole surface with
+  it.** `resolveAnswer` read `remote.userQuestions` through `ctx.get` without
+  declaring it on the context, so Cordis threw; the overlay's stylesheet and
+  floating button never mounted, and the tree fell back to unstyled browser
+  buttons. The service is now acquired through a child `ctx.inject`, so a
+  composition without user-questions still renders the board read-only.
+- The tree carries its own copy of the stylesheet, so a broken or unmounted
+  overlay can never leave default browser buttons in the navigation again.
 - Question payloads are narrowed before rendering: malformed calls, empty
   question ids and bad options are dropped without taking down the board.
 - Question changes now participate in the store's structural comparison, so a

@@ -45,6 +45,10 @@ export interface LocaleFile {
     readonly decisionUnit: string
     readonly executingUnit: string
     readonly recentUnit: string
+    /** Per-board empty copy; more specific than the shared `empty`. */
+    readonly decisionEmpty: string
+    readonly executingEmpty: string
+    readonly recentEmpty: string
   }
   readonly question: {
     readonly label: string

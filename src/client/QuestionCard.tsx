@@ -163,10 +163,13 @@ function QuestionCall({
                       title={option.description}
                       onClick={() => choose(question, option.label)}
                     >
-                      <span className="status-board__q-option-label">{option.label}</span>
-                      {option.description === undefined ? null : (
-                        <span className="status-board__q-option-desc">{option.description}</span>
-                      )}
+                      <span className="status-board__q-option-mark" data-selected={selected} aria-hidden="true" />
+                      <span className="status-board__q-option-copy">
+                        <span className="status-board__q-option-label">{option.label}</span>
+                        {option.description === undefined ? null : (
+                          <span className="status-board__q-option-desc">{option.description}</span>
+                        )}
+                      </span>
                     </button>
                   )
                 })}

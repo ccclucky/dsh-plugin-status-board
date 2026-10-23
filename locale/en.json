@@ -20,7 +20,10 @@
     "collapse": "Collapse “{name}”: {count} sessions",
     "decisionUnit": "waiting on you",
     "executingUnit": "running",
-    "recentUnit": "recent"
+    "recentUnit": "recent",
+    "decisionEmpty": "Nothing waiting on you",
+    "executingEmpty": "Nothing running",
+    "recentEmpty": "No recent activity"
   },
   "state": {
     "loading": "Reading sessions…",

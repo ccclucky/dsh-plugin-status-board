@@ -31,6 +31,7 @@ import { bucketToggleLabel, isCollapsed, totalRows } from '../shared/board.ts'
 import { createTranslate, formatRelativeTime, type MessageKey, type Translate } from '../shared/i18n.ts'
 import type { BoardState, BoardStore } from './store.ts'
 import { QuestionCard, type AnswerQuestion } from './QuestionCard.tsx'
+import { StatusMark } from './StatusMark.tsx'
 import { PANEL_CSS } from './styles.ts'
 
 /** The panel's props: the store it renders plus the navigation seam. */
@@ -150,7 +151,7 @@ export function Row({
   // never changes its hook order between two publications.
   const [expanded, setExpanded] = useState(false)
   const content = [
-    <span className="status-board__dot" data-state={bucket} aria-hidden="true" key="dot" />,
+    <StatusMark bucket={bucket} variant="row" key="dot" />,
     <span className="status-board__row-title" key="title">
       {entry.title}
     </span>,
@@ -249,7 +250,7 @@ function Bucket({
   const count = visible.length
   const name = translate(`bucket.${id}` as MessageKey)
   const hint = translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
-  const unit = translate(`bucket.${id}Unit` as MessageKey)
+  const empty = translate(`bucket.${id}Empty` as MessageKey)
   const filtering = query.trim().length > 0
 
   // While filtering, a board with no match is noise: the user asked a question
@@ -262,7 +263,7 @@ function Bucket({
   const loading = state.status === 'loading' && count === 0
 
   return (
-    <section className="status-board__card" data-bucket={id} aria-labelledby={headingId}>
+    <section className="status-board__card" data-bucket={id} data-count-empty={count === 0} aria-labelledby={headingId}>
       <h2 className="status-board__heading" id={headingId}>
         <button
           type="button"
@@ -274,11 +275,10 @@ function Bucket({
           onClick={() => store.toggle(id)}
         >
           <Chevron collapsed={collapsed} />
+          <StatusMark bucket={id} variant="folder" empty={count === 0} />
           <span className="status-board__name-text">{name}</span>
-          {/* Small count on the header itself; the decision board additionally
-              gets the large readout below, because that is the one board whose
-              size is worth spending. The toggle's accessible name already states
-              the number, so this is hidden from AT. */}
+          {/* Small count on the header; the toggle's accessible name already
+              states the number, so this is hidden from AT. */}
           <span className="status-board__count" aria-hidden="true">
             {count}
           </span>
@@ -288,21 +288,8 @@ function Bucket({
           real element (ARIA requires IDREFs to resolve). `role="group"`, not
           `role="region"`: the module is already a landmark. */}
       <div id={regionId} role="group" aria-label={name} hidden={collapsed}>
-        {/* Only the decision board states its size in words: it is the one that
-            asks the user to act, so it earns the emphasis. The other two are
-            lists the user scans, and a big number there would compete with the
-            rows they are trying to read. */}
-        {id === 'decision' && count > 0 ? (
-          <>
-            <p className="status-board__readout" aria-hidden="true">
-              <span className="status-board__readout-n">{count}</span>
-              <span className="status-board__readout-u">{unit}</span>
-            </p>
-            <div className="status-board__rule" aria-hidden="true" />
-          </>
-        ) : null}
         {loading ? null : count === 0 ? (
-          <p className="status-board__empty">{translate('bucket.empty')}</p>
+          <p className="status-board__empty">{empty}</p>
         ) : (
           <ul className="status-board__rows">
             {visible.map(entry => (

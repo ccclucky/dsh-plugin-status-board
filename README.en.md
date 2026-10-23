@@ -37,8 +37,9 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 ## Features
 
-- **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right button opens the **full board**.
+- **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right pill opens the **full board**.
 - **The sidebar tree is navigation only** — click a session exactly like the Workspace browser; no approval or answer controls live in the tree.
+- **Status marks carry state, not just colour** — a slow breathing amber halo for decisions, a spinning blue arc for work in flight, and stillness for history; directories are the filled, stronger variant, sessions the hollow one. Motion switches off under reduced-motion.
 - **Inline question card in the floating board** — decision rows expand; `continued` questions submit in place, while `open` questions point at the session's own card.
 - **Three collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
 - **Correct precedence** — a session waiting on your decision lands on the decision board even while its agent is still running; it never drowns in "Running".
@@ -57,7 +58,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 1. Open the DSH Web UI → **Settings → Plugins**.
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
-3. Reload the page. A **Session Status Board** row appears in the sidebar nav list. Clicking it expands 3 status folders; clicking a session opens it. The round button in the bottom-right corner opens the full board. Press `Esc`, click outside the panel, or use its × to dismiss.
+3. Reload the page. A **Session Status Board** row appears in the sidebar nav list. Clicking it expands 3 status folders; clicking a session opens it. The floating pill in the bottom-right corner opens the full board. Press `Esc`, click outside the panel, or use its × to dismiss.
 
 ### Option 2 — CLI, from npm (recommended for scripted setups)
 
@@ -143,7 +144,7 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
                                        │  sidebar.panellist → row click│
                                        │    └─ inline tree (navigation)│
                                        │  shell.overlay    → bottom-   │
-                                       │    right button → board + card│
+                                       │    right pill → board + card  │
                                        └──────────────────────────────┘
 ```
 

@@ -22,6 +22,8 @@ import { bucketToggleLabel, isCollapsed } from '../shared/board.ts'
 import { createTranslate, formatRelativeTime, type Translate } from '../shared/i18n.ts'
 import type { BoardStore } from './store.ts'
 import { Chevron, useRelativeClock } from './Panel.tsx'
+import { StatusMark } from './StatusMark.tsx'
+import { PANEL_CSS } from './styles.ts'
 
 /** The tree's props: the store it renders and the navigation seam. */
 export interface TreeProps {
@@ -50,10 +52,12 @@ function TreeRow({
   const time = formatRelativeTime(now, entry.lastActivityAt, translate)
   const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
   const content = [
-    <span className="status-board-tree__dot" data-bucket={bucket} aria-hidden="true" key="dot" />,
-    <span className="status-board-tree__body" key="body">
-      <span className="status-board-tree__title">{entry.title}</span>
-      <span className="status-board-tree__time">{time}</span>
+    <StatusMark bucket={bucket} variant="row" key="dot" />,
+    <span className="status-board-tree__title" key="title">
+      {entry.title}
+    </span>,
+    <span className="status-board-tree__time" key="time">
+      {time}
     </span>,
   ]
   if (onOpenSession === undefined) {
@@ -100,12 +104,13 @@ function TreeFolder({
   const collapsed = isCollapsed(state.collapse, id)
   const name = translate(`bucket.${id}`)
   const hint = translate(`bucket.${id}Hint`, { hours: state.board.windowHours })
+  const empty = translate(`bucket.${id}Empty`)
   const count = board.entries.length
   const regionId = `status-board-tree-region-${id}`
   const loading = state.status === 'loading' && count === 0
 
   return (
-    <section className="status-board-tree__folder" data-bucket={id}>
+    <section className="status-board-tree__folder" data-bucket={id} data-count-empty={count === 0}>
       <h3 className="status-board-tree__heading">
         <button
           type="button"
@@ -117,7 +122,7 @@ function TreeFolder({
           onClick={() => store.toggle(id)}
         >
           <Chevron collapsed={collapsed} />
-          <span className="status-board-tree__dot" data-bucket={id} aria-hidden="true" />
+          <StatusMark bucket={id} variant="folder" empty={count === 0} />
           <span className="status-board-tree__name">{name}</span>
           <span className="status-board-tree__count" aria-hidden="true">
             {count}
@@ -127,7 +132,7 @@ function TreeFolder({
       {/* Mounted while collapsed so aria-controls always resolves. */}
       <div id={regionId} role="group" aria-label={name} hidden={collapsed}>
         {loading ? null : count === 0 ? (
-          <p className="status-board-tree__empty">{translate('bucket.empty')}</p>
+          <p className="status-board-tree__empty">{empty}</p>
         ) : (
           <ul className="status-board-tree__rows">
             {board.entries.map(entry => (
@@ -162,6 +167,10 @@ export function StatusTree({ store, onOpenSession }: TreeProps): ReactElement {
 
   return (
     <div className="status-board-tree" role="group" aria-label={translate('tree.label')}>
+      {/* The tree lives in the sidebar, outside the floating popover. It carries
+          its own copy of the stylesheet so a broken/unmounted overlay cannot
+          leave default browser buttons in the navigation. */}
+      <style>{PANEL_CSS}</style>
       {state.status === 'error' ? (
         <p className="status-board-tree__alert" role="alert">
           {translate('state.error')}

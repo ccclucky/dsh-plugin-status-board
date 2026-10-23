@@ -84,6 +84,11 @@ export interface ClientContext {
   readonly locale: LocaleService
   get(name: string): unknown
   effect(callback: () => unknown, label?: string): unknown
+  /**
+   * Wait for optional services on a child context. Used for the answer Remote:
+   * the board must keep working when a composition disables user-questions.
+   */
+  inject(keys: readonly string[], callback: (ctx: { get(name: string): unknown }) => void, label?: string): unknown
 }
 
 /**
@@ -187,26 +192,32 @@ export function apply(ctx: ClientContext): void {
   const navLabel = (): string => createTranslate(store.getSnapshot().locale)('panel.title')
 
   /**
-   * Resolve the Host answer RPC lazily.
+   * The Host answer RPC.
    *
-   * `remote.userQuestions` is a capability of the composed profile; treating it
-   * as a hard inject would make the whole plugin fail to activate on a profile
-   * that disabled the user-questions plugin. Without it the card stays
+   * `remote.userQuestions` is a capability of the composed profile. Waiting for
+   * it on a child context (instead of a hard inject on the plugin) keeps the
+   * board alive when that plugin is disabled; without it the card stays
    * read-only and the row offers "open session" instead.
    */
+  type UserQuestionsRemote = {
+    readonly answer: (
+      sessionId: string,
+      callId: string,
+      answer: AnswerBatch,
+    ) => Promise<{ readonly ok: true; readonly value: boolean } | { readonly ok: false; readonly error: { readonly message: string } }>
+  }
+
+  let answerApi: UserQuestionsRemote | undefined
+  ctx.inject(
+    ['remote.userQuestions'],
+    answerCtx => {
+      answerApi = answerCtx.get('remote.userQuestions') as UserQuestionsRemote | undefined
+    },
+    'status-board: answer service',
+  )
+
   const resolveAnswer = (): AnswerQuestion | undefined => {
-    const remote = ctx.get('remote') as
-      | {
-          readonly userQuestions?: {
-            readonly answer?: (
-              sessionId: string,
-              callId: string,
-              answer: AnswerBatch,
-            ) => Promise<{ readonly ok: true; readonly value: boolean } | { readonly ok: false; readonly error: { readonly message: string } }>
-          }
-        }
-      | undefined
-    const api = remote?.userQuestions
+    const api = answerApi
     if (api === undefined || typeof api.answer !== 'function') return undefined
     // Keep the namespace as the receiver: Remote methods are generated on the
     // namespace object and may rely on `this`.

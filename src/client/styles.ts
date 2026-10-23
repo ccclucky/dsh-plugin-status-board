@@ -72,10 +72,11 @@ export const PANEL_CSS = String.raw`
 .status-board__filter {
   box-sizing: border-box;
   width: 100%;
-  margin: 0 0 8px;
-  padding: 5px 9px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 7px;
+  min-height: 32px;
+  margin: 0 0 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -103,7 +104,7 @@ export const PANEL_CSS = String.raw`
 .status-board__scroll {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -128,18 +129,9 @@ export const PANEL_CSS = String.raw`
    The accents below are the ones that read as three distinct states in both
    themes — amber for a decision, the product blue for work in flight, mid-grey
    for history. */
-.status-board__card {
-  /* Each board owns an accent; everything inside reads it, so one declaration
-     per board colours its count pill, its rows' dots, and its rule. */
-  --sb-accent: var(--dsw-alias-label-tertiary);
-}
-
-.status-board__card[data-bucket="decision"] {
-  --sb-accent: var(--dsw-alias-state-warn-label);
-}
-
-.status-board__card[data-bucket="executing"] {
-  --sb-accent: var(--dsw-alias-state-business-primary);
+.status-board__card + .status-board__card {
+  padding-top: 12px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
 }
 
 .status-board__heading {
@@ -156,15 +148,15 @@ export const PANEL_CSS = String.raw`
 
 .status-board__toggle {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   align-items: center;
   width: 100%;
-  min-height: 26px;
-  padding: 2px 6px;
+  min-height: 30px;
+  padding: 3px 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -203,9 +195,9 @@ export const PANEL_CSS = String.raw`
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -213,50 +205,17 @@ export const PANEL_CSS = String.raw`
 /* Small header count. It carries no colour of its own — the reference keeps
    every tally in the text colour, so the numbers read as data rather than as
    three competing statuses. Only the decision board tints its tally, because
-   that is the one number the user has to act on (and the one that also gets
-   the large readout below). */
+   that is the one number the user has to act on. */
 .status-board__count {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.status-board__card[data-bucket="decision"] .status-board__count {
+.status-board__card[data-bucket="decision"][data-count-empty="false"] .status-board__count {
   color: var(--dsw-alias-state-warn-primary);
-}
-
-/* The decision board's readout: number at reading size, unit at caption size,
-   on one baseline, over a hairline that closes the section. This is the single
-   place the panel spends size on emphasis. Named apart from the nav-row count
-   pill below so the two never inherit each other's box model. */
-.status-board__readout {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-  margin: 0;
-  padding: 1px 6px 4px 15px;
-}
-
-.status-board__readout-n {
-  color: var(--sb-accent);
-  font-size: 24px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.status-board__readout-u {
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11.5px;
-}
-
-.status-board__rule {
-  height: 1px;
-  margin: 0 6px 3px 15px;
-  background: var(--dsw-alias-border-l1);
 }
 
 /* ── Rows ────────────────────────────────────────────────────────────────── */
@@ -268,7 +227,7 @@ export const PANEL_CSS = String.raw`
   margin: 1px 0 0;
   /* Indent to the section label's text edge, not to its chevron: the rows read
      as the section's content. */
-  padding: 0 0 2px 16px;
+  padding: 0 0 2px 18px;
   list-style: none;
 }
 
@@ -307,25 +266,11 @@ button.status-board__row:active {
   outline-offset: -2px;
 }
 
-.status-board__dot {
-  flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--sb-accent);
-}
-
-/* The decision dot is the one row that may need to catch the eye from across
-   the screen, so it gets a halo; the others stay quiet. */
-.status-board__card[data-bucket="decision"] .status-board__dot {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sb-accent) 20%, transparent);
-}
-
 .status-board__row-title {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -333,7 +278,7 @@ button.status-board__row:active {
 .status-board__row-meta {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -342,9 +287,9 @@ button.status-board__row:active {
 
 .status-board__empty {
   margin: 0;
-  padding: 3px 6px 4px 16px;
+  padding: 3px 6px 4px 18px;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 .status-board__truncated {
@@ -407,27 +352,34 @@ button.status-board__row:active {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 8px 9px 12px;
+  padding: 11px 10px 10px 14px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
-.status-board__overlay-title {
+.status-board__overlay-heading {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
+  gap: 1px;
+}
+
+.status-board__overlay-title {
   overflow: hidden;
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
   color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status-board__overlay-total {
-  flex: 0 0 auto;
+.status-board__overlay-subtitle {
+  overflow: hidden;
   color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -480,23 +432,172 @@ button.status-board__row:active {
 
 .status-board__nav-chevron {
   position: absolute;
-  right: 10px;
+  right: 9px;
   top: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   color: var(--dsw-alias-label-secondary);
-  font-size: 8px;
   line-height: 1;
   transform: translateY(-50%);
-  transition: transform 120ms ease, color 120ms ease;
+  transition: color 120ms ease;
 }
 
 .status-board__nav-chevron[data-open="true"] {
-  color: var(--dsw-alias-state-business-primary);
-  transform: translateY(-50%) rotate(90deg);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Shared status marker ─────────────────────────────────────────────────── */
+
+/* Directory and session markers share a hue but not a weight: the directory is
+   the filled, stronger variant; the session is the hollow/soft one. The motion
+   encodes the state: a slow breath for a decision waiting on a human, a spin for
+   work in flight, stillness for history. */
+.status-board-status {
+  --sb-status-size: 12px;
+  --sb-status: var(--dsw-alias-label-tertiary);
+  --sb-status-soft: color-mix(in srgb, var(--sb-status) 55%, transparent);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--sb-status-size);
+  height: var(--sb-status-size);
+}
+
+.status-board-status[data-variant="folder"] {
+  --sb-status-size: 16px;
+}
+
+.status-board-status[data-bucket="decision"] {
+  --sb-status: var(--dsw-alias-state-warn-label);
+}
+
+.status-board-status[data-bucket="executing"] {
+  --sb-status: var(--dsw-alias-state-business-primary);
+}
+
+.status-board-status::before,
+.status-board-status::after {
+  content: "";
+  grid-area: 1 / 1;
+  box-sizing: border-box;
+  border-radius: 50%;
+}
+
+/* Decision: a filled dot in a breathing halo (directory), a hollow breathing
+   ring (session). */
+.status-board-status[data-bucket="decision"][data-variant="folder"]::before {
+  width: 8px;
+  height: 8px;
+  background: var(--sb-status);
+}
+
+.status-board-status[data-bucket="decision"][data-variant="folder"]::after {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--sb-status-soft);
+  animation: status-board-status-breathe 2.6s ease-in-out infinite;
+}
+
+.status-board-status[data-bucket="decision"][data-variant="row"]::before {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--sb-status);
+  background: transparent;
+  animation: status-board-status-breathe-soft 2.6s ease-in-out infinite;
+}
+
+/* Executing: a spinning arc; the directory adds a solid core, the session does
+   not. */
+.status-board-status[data-bucket="executing"][data-variant="folder"]::before {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--sb-status-soft);
+  border-top-color: var(--sb-status);
+  animation: status-board-status-spin 1.4s linear infinite;
+}
+
+.status-board-status[data-bucket="executing"][data-variant="folder"]::after {
+  width: 4px;
+  height: 4px;
+  background: var(--sb-status);
+}
+
+.status-board-status[data-bucket="executing"][data-variant="row"]::before {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--sb-status-soft);
+  border-top-color: var(--sb-status);
+  animation: status-board-status-spin 1.4s linear infinite;
+}
+
+/* Recent: a static dot with a faint ring (directory), a static hollow ring
+   (session). */
+.status-board-status[data-bucket="recent"][data-variant="folder"]::before {
+  width: 6px;
+  height: 6px;
+  background: var(--sb-status);
+}
+
+.status-board-status[data-bucket="recent"][data-variant="folder"]::after {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--sb-status-soft);
+}
+
+.status-board-status[data-bucket="recent"][data-variant="row"]::before {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--sb-status-soft);
+  background: transparent;
+}
+
+@keyframes status-board-status-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.86);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes status-board-status-breathe-soft {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* A directory with no sessions is not a live state: keep its shape, drop the
+   motion and dim it so a zero never reads as an alarm. */
+.status-board-status[data-empty="true"]::before,
+.status-board-status[data-empty="true"]::after {
+  opacity: 0.45;
+  animation: none;
+}
+
+@keyframes status-board-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-board-status::before,
+  .status-board-status::after {
+    animation: none !important;
+  }
 }
 
 /* ── Inline tree (entry ①) ───────────────────────────────────────────────── */
@@ -507,11 +608,14 @@ button.status-board__row:active {
 .status-board__tree-portal {
   display: block;
   flex: none;
-  margin: 0 2px 4px;
-  max-height: min(46vh, 420px);
+  margin: 2px 2px 8px;
+  padding: 3px;
+  max-height: min(44vh, 400px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 62%, transparent);
 }
 
 .status-board__tree-portal[hidden] {
@@ -521,25 +625,15 @@ button.status-board__row:active {
 .status-board-tree {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin-left: 8px;
-  padding: 2px 0 4px 9px;
-  border-left: 1px solid var(--dsw-alias-border-l1);
+  gap: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .status-board-tree__folder {
-  --sb-tree-accent: var(--dsw-alias-label-tertiary);
   display: flex;
   flex-direction: column;
-  gap: 1px;
-}
-
-.status-board-tree__folder[data-bucket="decision"] {
-  --sb-tree-accent: var(--dsw-alias-state-warn-label);
-}
-
-.status-board-tree__folder[data-bucket="executing"] {
-  --sb-tree-accent: var(--dsw-alias-state-business-primary);
+  gap: 0;
 }
 
 .status-board-tree__heading {
@@ -551,17 +645,18 @@ button.status-board__row:active {
 .status-board-tree__toggle {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
+  box-sizing: border-box;
   width: 100%;
-  min-height: 28px;
-  padding: 4px 5px;
+  min-height: 30px;
+  padding: 3px 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 650;
   text-align: left;
   cursor: pointer;
 }
@@ -575,19 +670,11 @@ button.status-board__row:active {
   outline-offset: -2px;
 }
 
-.status-board-tree__dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--sb-tree-accent);
-}
-
 .status-board-tree__name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 12.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -596,30 +683,37 @@ button.status-board__row:active {
   flex: 0 0 auto;
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.status-board-tree__folder[data-bucket="decision"][data-count-empty="false"] .status-board-tree__count {
+  color: var(--dsw-alias-state-warn-primary);
 }
 
 .status-board-tree__rows {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   margin: 0;
-  padding: 0 0 2px 14px;
+  padding: 0 0 4px 18px;
   list-style: none;
 }
 
 .status-board-tree__row {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
   width: 100%;
   min-height: 28px;
-  padding: 4px 5px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
+  font-size: 12px;
   text-align: left;
 }
 
@@ -636,38 +730,37 @@ button.status-board-tree__row:hover {
   outline-offset: -2px;
 }
 
-.status-board-tree__body {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-  gap: 0;
-}
+
 
 .status-board-tree__title {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .status-board-tree__time {
+  flex: 0 0 auto;
+  margin-left: auto;
   color: var(--dsw-alias-label-secondary);
-  font-size: 10px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
   line-height: 1.3;
 }
 
 .status-board-tree__empty {
   margin: 0;
-  padding: 2px 5px 4px 19px;
+  padding: 2px 6px 5px 21px;
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
 }
 
 .status-board-tree__truncated {
   margin: 0;
-  padding: 1px 5px 3px 19px;
+  padding: 1px 6px 3px 21px;
   color: var(--dsw-alias-label-secondary);
   font-size: 10px;
 }
@@ -719,13 +812,14 @@ button.status-board-tree__row:hover {
 
 .status-board__answer-toggle {
   flex: 0 0 auto;
-  padding: 4px 7px;
+  padding: 3px 7px;
   border: 0;
-  border-radius: 5px;
-  background: var(--dsw-alias-bg-layer-2);
+  border-radius: 6px;
+  background: transparent;
   color: var(--dsw-alias-state-business-primary);
   font: inherit;
   font-size: 10.5px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -739,7 +833,7 @@ button.status-board-tree__row:hover {
 }
 
 .status-board__qcard-host {
-  padding: 2px 0 4px 16px;
+  padding: 2px 0 4px 18px;
 }
 
 /* ── Question card (L2) ──────────────────────────────────────────────────── */
@@ -747,17 +841,17 @@ button.status-board-tree__row:hover {
 .status-board__qcard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-2);
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-warn-label) 24%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-label) 4%, var(--dsw-alias-bg-layer-1));
 }
 
 .status-board__qcall {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -776,7 +870,7 @@ button.status-board-tree__row:hover {
 .status-board__q-title {
   padding: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 650;
   line-height: 1.4;
 }
@@ -807,18 +901,19 @@ button.status-board-tree__row:hover {
 .status-board__q-options {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 7px;
 }
 
 .status-board__q-option {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
   width: 100%;
-  padding: 5px 7px;
+  padding: 7px 9px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -833,7 +928,7 @@ button.status-board-tree__row:hover {
 
 .status-board__q-option[data-selected="true"] {
   border-color: var(--dsw-alias-state-business-primary);
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, var(--dsw-alias-bg-layer-1));
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 7%, var(--dsw-alias-bg-layer-1));
 }
 
 .status-board__q-option:disabled {
@@ -850,6 +945,41 @@ button.status-board-tree__row:hover {
   font-weight: 600;
 }
 
+.status-board__q-option-mark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.status-board__q-option-mark[data-selected="true"] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.status-board__q-option-mark[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 6px;
+  border: solid var(--dsw-alias-label-primary-foreground);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.status-board__q-option-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
 .status-board__q-option-desc {
   color: var(--dsw-alias-label-secondary);
   font-size: 10.5px;
@@ -859,8 +989,8 @@ button.status-board-tree__row:hover {
 .status-board__q-custom {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 7px;
 }
 
 .status-board__q-custom-label {
@@ -871,9 +1001,10 @@ button.status-board-tree__row:hover {
 .status-board__q-input {
   box-sizing: border-box;
   width: 100%;
-  padding: 5px 7px;
+  min-height: 30px;
+  padding: 5px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -896,14 +1027,14 @@ button.status-board-tree__row:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 7px;
+  gap: 7px;
+  margin-top: 8px;
 }
 
 .status-board__q-submit {
-  padding: 5px 10px;
+  padding: 6px 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--dsw-alias-state-business-primary);
   color: var(--dsw-alias-label-primary-foreground);
   font: inherit;
@@ -923,9 +1054,9 @@ button.status-board-tree__row:hover {
 }
 
 .status-board__q-open {
-  padding: 5px 9px;
+  padding: 6px 10px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 7px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
@@ -974,18 +1105,28 @@ button.status-board-tree__row:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
+  gap: 7px;
+  box-sizing: border-box;
+  min-width: 38px;
+  height: 34px;
+  padding: 0 12px 0 10px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
   box-shadow:
-    0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
-    0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 8px 20px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
   cursor: pointer;
   pointer-events: auto;
+}
+
+.status-board__fab-label {
+  display: inline;
+  white-space: nowrap;
 }
 
 .status-board__fab:hover {
@@ -998,20 +1139,16 @@ button.status-board-tree__row:hover {
 }
 
 .status-board__fab-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border: 2px solid var(--dsw-alias-bg-layer-1);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   background: var(--dsw-alias-state-warn-primary);
   color: var(--dsw-alias-label-primary-foreground);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1019,9 +1156,9 @@ button.status-board-tree__row:hover {
 .status-board__overlay--fab {
   position: fixed;
   right: 16px;
-  bottom: 64px;
+  bottom: 60px;
   z-index: 61;
-  width: min(380px, calc(100vw - 24px));
+  width: min(382px, calc(100vw - 24px));
   max-height: min(70vh, 560px);
 }
 
@@ -1041,6 +1178,19 @@ button.status-board-tree__row:hover {
   .status-board__fab {
     right: 12px;
     bottom: 88px;
+    width: 38px;
+    padding: 0;
+  }
+
+  .status-board__fab-label {
+    display: none;
+  }
+
+  .status-board__fab-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    border: 2px solid var(--dsw-alias-bg-layer-1);
   }
 
   .status-board__overlay--fab {

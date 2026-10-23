@@ -24,7 +24,7 @@ import {
 import { createPortal } from 'react-dom'
 import { createTranslate } from '../shared/i18n.ts'
 import type { BoardState, BoardStore } from './store.ts'
-import { BoardGlyph, BoardPanel } from './Panel.tsx'
+import { BoardGlyph, BoardPanel, Chevron } from './Panel.tsx'
 import { StatusTree } from './Tree.tsx'
 import type { AnswerQuestion } from './QuestionCard.tsx'
 import { PANEL_CSS } from './styles.ts'
@@ -257,7 +257,7 @@ export function BoardNavEntry({
         <BoardGlyph size={size} />
         {collapsed ? null : (
           <span className="status-board__nav-chevron" data-open={open} aria-hidden="true">
-            ▾
+            <Chevron collapsed={!open} />
           </span>
         )}
       </span>
@@ -360,7 +360,8 @@ export function BoardOverlay({
         title={aria}
         onClick={() => controller.toggle()}
       >
-        <BoardGlyph size={18} />
+        <BoardGlyph size={16} />
+        <span className="status-board__fab-label">{translate('panel.shortTitle')}</span>
         {counts.decision > 0 ? (
           <span className="status-board__fab-badge" aria-hidden="true">
             {counts.decision}
@@ -377,10 +378,10 @@ export function BoardOverlay({
           tabIndex={-1}
         >
           <div className="status-board__overlay-bar">
-            <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
-            <span className="status-board__overlay-total" aria-label={translate('summary.total', { total })}>
-              {total}
-            </span>
+            <div className="status-board__overlay-heading">
+              <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
+              <span className="status-board__overlay-subtitle">{translate('summary.total', { total })}</span>
+            </div>
             <button
               type="button"
               className="status-board__overlay-close"
