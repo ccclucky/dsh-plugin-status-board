@@ -1,0 +1,179 @@
+# Publish to npm when a GitHub Release is published (option B: the human
+# decision is the click on "Publish release"; the tag and the draft release are
+# a staging area that can still be edited or deleted).
+#
+# WHY THIS FILE IS NAMED release.yml
+# ───────────────────────────────────
+# npm's trusted-publisher record stores the workflow file name, and npm refuses
+# to change an existing record ("Existing trusted publisher connections cannot
+# be changed"), so renaming this file later would need the publisher deleted and
+# re-added. Decide the name once; keep it.
+#
+# WHY THE CHECKS ARE DUPLICATED FROM ci.yml INSTEAD OF REUSING IT
+# ───────────────────────────────────────────────────────────────
+# npm documents that with `workflow_call`, trusted-publisher validation looks at
+# the *calling* workflow's name rather than the file holding `npm publish`, which
+# silently breaks authentication. Inlining is repetition with a reason.
+name: Release
+
+on:
+  release:
+    types: [published]
+  # Manual entry point, dry run by default: runs every gate and build step but
+  # never publishes, so the plumbing can be proven on main without shipping.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run all gates and the build, but do not publish
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  # Minted by the runner and exchanged for an npm token at publish time. This is
+  # what removes the need for an NPM_TOKEN secret (and for the long-lived
+  # publish token this repo used before).
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version:` here; package.json's `packageManager` is the single source
+      # of truth, same as in ci.yml. See that file for why pinning both fails.
+      - uses: pnpm/action-setup@v4
+
+      # Node 24 = the build/toolchain floor (see ci.yml). The supported runtime
+      # is a separate question and is still Node >=20, asserted by the emitted
+      # `target: node20` for the Host half.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build (includes the loader-envelope smoke check)
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      # ── Release gates ─────────────────────────────────────────────────────
+      # These run last on purpose: they are cheap, and reaching them means the
+      # artefact is already known good, so a green gate set is a publishable
+      # build rather than "a build that might still fail".
+      - name: Check that the tag, the manifest and the registry agree
+        id: gate
+        env:
+          # `refs/tags/v1.2.3` on a release event; empty on workflow_dispatch.
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+
+          version=$(node -p "require('./package.json').version")
+
+          # A manual dry run has no release tag, so the tag gate is asserted
+          # against whatever the branch is released from: skip the equality check
+          # and say so loudly rather than inventing a passing signal.
+          if [ "$EVENT_NAME" = "release" ]; then
+            case "$GITHUB_REF_NAME" in
+              v[0-9]*) ;;
+              *) echo "::error::release tag '$GITHUB_REF_NAME' must start with 'v'"; exit 1 ;;
+            esac
+            tag="${GITHUB_REF_NAME#v}"
+            if [ "$tag" != "$version" ]; then
+              echo "::error::tag says v$tag but package.json says $version. The tag is the release; fix the manifest, do not move the tag."
+              exit 1
+            fi
+            echo "tag/package.json agree on $version"
+          else
+            # No release tag on a manual run, so the equality gate cannot be
+            # asserted here. Say so instead of letting a green check imply it was.
+            echo "::warning::manual run: the tag==manifest gate is NOT exercised here"
+          fi
+
+          # npm refuses to republish a version, and a failed-but-partial publish
+          # would otherwise surface as a confusing 403 much later. Fail early.
+          if npm view "dsh-plugin-status-board@$version" version >/dev/null 2>&1; then
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::warning::$version is already on the registry - expected for a dry run on a released version"
+            else
+              echo "::error::$version already exists on npm; bump the version before publishing"
+              exit 1
+            fi
+          else
+            echo "$version is new to the registry"
+          fi
+
+          # A version with a pre-release identifier must not become `latest`.
+          case "$version" in
+            *-*) echo "dist_tag=next" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "dist_tag=latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+          # The only version the rest of the job may use. Deriving it once here
+          # means the publish step and the clean-install step cannot disagree
+          # with the manifest that was just built.
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the packed file list
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        # Written so that a release event publishes without consulting `inputs`
+        # at all: on that event the context is absent, and `null == false` would
+        # leave the decision to GitHub's type coercion. A manual run publishes
+        # only when the dry-run flag is explicitly off.
+        if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
+        run: npm publish --provenance --access public --tag "${{ steps.gate.outputs.dist_tag }}"
+
+      # Proves the published bytes work for a real consumer, in a directory that
+      # shares nothing with this checkout. This is the only step that can see a
+      # packaging mistake (a missing `files` entry, a bad `exports` map).
+      - name: Install the published version in a clean directory
+        # npm's CDN takes a moment to agree with the registry, so retry - but a
+        # bounded number of times. `until cmd; do ...; done` would spin forever
+        # on a publish that genuinely cannot be installed, hanging the runner
+        # instead of failing the release.
+        if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
+        env:
+          VERSION: ${{ steps.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir=$(mktemp -d)
+          cd "$dir"
+          npm init -y >/dev/null
+          published=no
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if npm install --no-audit --no-fund "dsh-plugin-status-board@$VERSION" >install.log 2>&1; then
+              published=yes
+              break
+            fi
+            echo "attempt $attempt/8 failed; waiting for the registry"
+            sleep 20
+          done
+          if [ "$published" != yes ]; then
+            echo "::error::$VERSION is not installable after 8 attempts"
+            tail -n 25 install.log
+            exit 1
+          fi
+          test -f node_modules/dsh-plugin-status-board/lib/client.js
+          test -f node_modules/dsh-plugin-status-board/lib/index.js
+          test -f node_modules/dsh-plugin-status-board/cordis.patch.yml
+          # The published package is `"type": "module"`, so the Host half is
+          # ESM: load it with `import()`, which is how the Cordis Loader actually
+          # consumes it. `require()` of ESM depends on the Node version.
+          node --input-type=module -e "
+            const m = await import('./node_modules/dsh-plugin-status-board/lib/index.js');
+            if (typeof m.apply !== 'function') throw new Error('published Host half does not export apply()');
+            if (m.Config === undefined) throw new Error('published Host half does not export Config');
+          "
+          echo "installed and loaded dsh-plugin-status-board@$VERSION"

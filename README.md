@@ -226,6 +226,40 @@ dsh-plugin-status-board/
 
 ---
 
+## 发布流程（维护者）
+
+发布由 GitHub Actions 完成，**不在本机 `npm publish`**。唯一的闸门是「发布一个 Release」这个人工动作：
+
+1. 升版本号并同步 `CHANGELOG.md`，提交、推 `main`、等 CI 绿。
+2. 打 tag 并推送：`git tag -a v0.2.2 -m "..." && git push origin v0.2.2`。
+3. 建**草稿** Release 写说明：`gh release create v0.2.2 --draft --title ... --notes-file ...`。
+4. 确认无误后点 **Publish release** → `release.yml` 接管，此后无人值守。
+
+草稿阶段可随时改可撤，这是「发 Release 才发布」相对「推 tag 即发布」多出的那一次反悔机会。
+
+`release.yml` 在真正发布前逐条把关：
+
+| 关卡 | 不满足时 |
+| :--- | :--- |
+| tag 形如 `v*`，且去掉 `v` 后与 `package.json` 完全一致 | 失败，并提示「tag 是事实源，改清单而不是挪 tag」 |
+| 该版本尚未存在于 npm | 失败，提示先升版本（npm 禁止覆盖已发布版本） |
+| 版本号带预发布标识（`-rc.1` 等） | 自动改用 `--tag next`，不污染 `latest` |
+| typecheck / build / 单元与产物测试 / pack | 任一步红即不发布 |
+
+通过后执行 `npm publish --provenance`：凭据由 runner 现场签发（OIDC），**仓库里不需要、也不应存在 npm 发布 token**。发布后还会在一个与本次 checkout 毫无关系的干净目录里 `npm install` 回来并 `import()` 一次——这是唯一能发现「打包清单漏了文件、`exports` 写错」这类问题的步骤。
+
+想在不发布的前提下验证整条链路，可在 **Actions → Release → Run workflow** 里勾上 dry run（默认勾选）：它会跑完全部关卡与构建，只跳过发布与装回。
+
+### 一次性配置（npm 侧）
+
+免 token 发布需要在 npm 上登记一次可信发布者：包页 **Publishing → Trusted publishers → Add publisher**，选 GitHub Actions，填 owner `ccclucky`、repository `dsh-plugin-status-board`、workflow 文件名 `release.yml`、event `release`，environment 留空。
+
+> ⚠️ 这些字段**大小写敏感、必须逐字一致**，且 npm 在保存时**不做校验**，错误只在真正发布时才暴露；而已登记的可信发布者**不可修改**，要改只能删掉重建。所以 `.github/workflows/release.yml` 这个文件名一经采用就不要再改。
+
+登记完成、首次 CI 发布成功后，即可吊销本机 `.npmrc` 里那个发布 token（它带 `bypass_2fa`，权限偏大）。
+
+---
+
 ## 许可
 
 [MIT](LICENSE) © 2026 CCLUCKY

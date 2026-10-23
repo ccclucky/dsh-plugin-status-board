@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A release pipeline.** Publishing now happens in CI, triggered by clicking
+  *Publish release* on a GitHub Release, and never by a local `npm publish`. The
+  tag and the draft release are the staging area; the click is the single human
+  gate. Before publishing, the workflow asserts that the tag, `package.json` and
+  the registry agree — the check whose absence let `0.1.0` reach npm with no
+  matching git tag — derives `--tag next` for pre-release versions so `latest`
+  cannot be polluted, and installs the published package into a clean directory
+  afterwards to catch packaging mistakes a build cannot see.
+- `workflow_dispatch` entry point with a default **dry run**, so the chain can
+  be proven without shipping anything.
+
+### Changed
+
+- The npm credential is no longer a long-lived token in `.npmrc`: the runner
+  exchanges an OIDC identity for one at publish time (npm *trusted publishing*),
+  and `--provenance` makes the published bytes attributable to this commit. The
+  local token, which also carried `bypass_2fa`, can be revoked once the first CI
+  publish succeeds.
+
 ## [0.2.1] — 2026-10-23
 
 ### Fixed

@@ -226,6 +226,40 @@ Nothing. The styles are a `<style>` element inside the panel component, so unmou
 
 ---
 
+## Release process (maintainers)
+
+Releases are published by GitHub Actions, never by a local `npm publish`. The one gate is the human act of publishing a Release:
+
+1. Bump the version and update `CHANGELOG.md`; commit, push to `main`, wait for CI.
+2. Tag and push: `git tag -a v0.2.2 -m "..." && git push origin v0.2.2`.
+3. Create a **draft** release with the notes: `gh release create v0.2.2 --draft --title ... --notes-file ...`.
+4. Click **Publish release** when it reads right — `release.yml` takes over and nothing is manual after that.
+
+A draft can still be edited or thrown away, which is the one extra chance "publish on release" buys over "publish on tag push".
+
+Before publishing anything, `release.yml` checks:
+
+| Gate | When it does not hold |
+| :--- | :--- |
+| The tag looks like `v*` and, minus the `v`, equals `package.json` exactly | Fails, saying "the tag is the release; fix the manifest, do not move the tag" |
+| The version is not already on npm | Fails, telling you to bump it (npm forbids republishing a version) |
+| The version carries a pre-release id (`-rc.1` and friends) | Publishes under `--tag next` so `latest` is never polluted |
+| typecheck / build / unit and artefact tests / pack | Any red stops the publish |
+
+It then runs `npm publish --provenance`: the credential is minted by the runner at publish time (OIDC), so **no npm publish token lives in the repository, and none should**. Afterwards it installs the published version into a throwaway directory that shares nothing with the checkout and `import()`s it — the only step that can catch a packaging mistake such as a missing `files` entry or a bad `exports` map.
+
+To prove the whole chain without shipping anything, run **Actions → Release → Run workflow** with the dry-run box ticked (it is the default): every gate and build step runs, publish and the install-back are skipped.
+
+### One-time setup (on the npm side)
+
+Token-free publishing needs a trusted publisher registered once, on the package page under **Publishing → Trusted publishers → Add publisher**: GitHub Actions, owner `ccclucky`, repository `dsh-plugin-status-board`, workflow file name `release.yml`, event `release`, environment left empty.
+
+> ⚠️ Those fields are **case-sensitive and must match character for character**, npm **does not validate them when you save** — a mistake only surfaces at the first real publish — and an existing trusted publisher **cannot be edited**, only deleted and re-added. So the file name `.github/workflows/release.yml` is a commitment: do not rename it afterwards.
+
+Once the first CI publish succeeds, revoke the publish token in the local `.npmrc` (it carries `bypass_2fa`, which is broader than it needs to be).
+
+---
+
 ## License
 
 [MIT](LICENSE) © 2026 CCLUCKY
