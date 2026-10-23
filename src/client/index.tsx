@@ -27,8 +27,8 @@
  */
 
 import { createElement, type ReactElement } from 'react'
-import { LOCALE_NAMESPACE } from '../shared/i18n.ts'
-import { createOverlayController, BoardOverlay, BoardTrigger } from './overlay.tsx'
+import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
+import { createOverlayController, BoardNavEntry, BoardOverlay, BoardTrigger, describeCountsShort } from './overlay.tsx'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
@@ -162,9 +162,13 @@ export function apply(ctx: ClientContext): void {
   }
 
   // ── Slots ─────────────────────────────────────────────────────────────────
-  // Shape C: a trigger beside Settings at the sidebar foot, and the board as a
-  // frame-wide floating panel. Both seats are additive (`replaceRisk: none`), so
-  // nothing shipped is replaced.
+  // Shape A: the entry is a row in the sidebar nav list, directly under the
+  // shipped rows, and the board opens as a frame-wide floating panel.
+  //
+  // The nav row's button belongs to the framework, which normally makes a click
+  // select a main column. `BoardNavEntry` captures that click on the row before
+  // the shell sees it, so the row opens the board instead of navigating — and no
+  // main-column registration is needed.
   //
   // `sidebar.workspaces` is deliberately NOT used: its catalog says "declaring
   // is claiming" and the shipped `sidebar` entry claims it for the workspace
@@ -172,14 +176,30 @@ export function apply(ctx: ClientContext): void {
   // delete the workspace list, its search box, and the new-session control.
   const controller = createOverlayController()
 
-  const Trigger = ({ wide }: { wide: boolean }): ReactElement =>
+  const NavEntry = ({ size }: { size: number }): ReactElement =>
+    createElement(BoardNavEntry, { controller, store, size })
+
+  // The row is icon + label only, so the counts ride in the label text: it is
+  // the one part of the row this plugin can shape.
+  const navLabel = (): string => {
+    const state = store.getSnapshot()
+    const translate = createTranslate(state.locale)
+    return `${translate('panel.title')} · ${describeCountsShort(translate, state)}`
+  }
+
+  // The foot action stays for the collapsed rail, where the nav list is gone.
+  const FootAction = ({ wide }: { wide: boolean }): ReactElement =>
     createElement(BoardTrigger, { controller, store, wide })
 
   const Overlay = (): ReactElement | null =>
     createElement(BoardOverlay, { controller, store, resolveNavigation })
 
+  ctx.slots.inject('sidebar.panellist', () =>
+    ctx.slots.register({ name: 'sidebar.panellist', id: 'status-board', order: 20, label: navLabel }, NavEntry),
+  )
+
   ctx.slots.inject('sidebar.footer.action', () =>
-    ctx.slots.register({ name: 'sidebar.footer.action', id: 'status-board', order: 20 }, Trigger),
+    ctx.slots.register({ name: 'sidebar.footer.action', id: 'status-board', order: 20 }, FootAction),
   )
 
   ctx.slots.inject('shell.overlay', () =>

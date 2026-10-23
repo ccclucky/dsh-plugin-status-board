@@ -330,6 +330,24 @@ button.status-board__row:active {
   font-size: 10.5px;
 }
 
+/* ── Sidebar-nav entry ───────────────────────────────────────────────────── */
+
+/* The framework draws the nav row and its label; this component only fills the
+   row's icon cell. It must therefore look like a shipped nav icon: no border,
+   no background of its own, colour inherited from the row so hover/selected
+   states keep working. */
+.status-board__nav-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  line-height: 0;
+}
+
+.status-board__nav-glyph[data-open="true"] {
+  color: var(--dsw-alias-brand-primary);
+}
+
 /* ── Sidebar-foot readout ────────────────────────────────────────────────── */
 
 /* Option A: the entry is an instrument, not an icon. It sits in the sidebar foot

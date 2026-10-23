@@ -1,12 +1,20 @@
 /**
- * The sidebar entry and its floating board (option C).
+ * The sidebar entry and its floating board.
  *
- * Shape: a small action button beside Settings at the sidebar foot, and a
- * frame-wide floating board that opens above the content and closes on Escape,
- * on an outside click, or by its own close button. Nothing in the shipped
- * sidebar is replaced: `sidebar.footer.action` and `shell.overlay` are both
- * additive seats (`replaceRisk: none`), which is why this shape is safe where
- * taking over `sidebar.workspaces` was not.
+ * Shape A (chosen from the rendered option board): the entry is a *readout* in
+ * the sidebar nav list, directly under the shipped rows, showing the three
+ * board counts. Opening it shows the board as a frame-wide floating panel.
+ *
+ * Where the numbers come from: the sidebar's nav rows are rendered by the
+ * framework from `sidebar.panellist`, and a click there normally selects a main
+ * column. This plugin has no main column, so its icon component captures the
+ * pointer and opens the floating board instead — which is why the entry can sit
+ * in the nav list and still not navigate anywhere.
+ *
+ * The counts live in the entry's own `label` thunk? No: the framework draws the
+ * label as plain text. So the numbers ride in the accessible name and as a
+ * trailing badge drawn inside the icon cell, which is the only part this plugin
+ * renders.
  *
  * Accessibility (WAI-ARIA disclosure/popover pattern):
  * - the trigger is a real `<button>` carrying `aria-expanded` and `aria-controls`;
@@ -68,16 +76,111 @@ export function createOverlayController(): OverlayController {
 }
 
 /**
- * The sidebar-foot readout.
+ * The sidebar-nav entry.
  *
- * A three-count strip, not an icon: the sidebar foot is the one seat this plugin
- * can put a real control in, so it carries the numbers that answer "what is
- * going on" without being opened. The shipped nav rows are framework-rendered
- * buttons that switch the main column, so a trigger there could not open a
+ * Shape A: the entry sits in the nav list, directly under the shipped rows, and
+ * reads out the three board counts. Opening it shows the board as a frame-wide
  * floating panel.
  *
- * Degrades in the 56px rail to the glyph plus the decision count, which is the
- * only number worth keeping when there is no room for a row.
+ * The one hard part: `sidebar.panellist` rows are rendered by the framework, and
+ * a click there normally selects a main column. This plugin has no main column,
+ * so the component (which the framework renders *inside* that row's button)
+ * captures the row's click and opens the floating board instead. The capture
+ * listener runs on the ancestor button itself, before the shell's own handler,
+ * and marks the button so the panel's outside-click guard does not treat the
+ * entry as "outside".
+ *
+ * Counts cannot be drawn here: this component only gets the row's icon cell. The
+ * numbers therefore ride in the row's label, which `apply` builds as a thunk.
+ */
+export function BoardNavEntry({
+  controller,
+  store,
+  size,
+}: {
+  readonly controller: OverlayController
+  readonly store: BoardStore
+  readonly size: number
+}): ReactElement {
+  const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const translate = createTranslate(state.locale)
+  const iconRef = useRef<HTMLSpanElement | null>(null)
+
+  const counts = countBoards(state)
+  const panelId = `status-board-overlay-${useId()}`
+  const aria = describeCounts(translate, counts)
+
+  // Capture the row's click so it opens the board instead of navigating.
+  useEffect(() => {
+    const row = iconRef.current?.closest('button')
+    if (row === null || row === undefined) return undefined
+    // Marked so the panel's outside-click guard can tell this entry apart from
+    // the rest of the page.
+    row.dataset.statusBoardEntry = 'true'
+    row.setAttribute('aria-expanded', String(open))
+    row.setAttribute('aria-controls', panelId)
+    row.setAttribute('aria-label', aria)
+    row.title = aria
+    const capture = (event: Event): void => {
+      event.preventDefault()
+      event.stopPropagation()
+      controller.toggle()
+    }
+    row.addEventListener('click', capture, true)
+    return () => row.removeEventListener('click', capture, true)
+  }, [controller, open, panelId, aria])
+
+  return (
+    <span ref={iconRef} className="status-board__nav-glyph" data-open={open}>
+      <BoardGlyph size={size} />
+    </span>
+  )
+}
+
+/** The three board counts, read from the same board the panel renders. */
+function countBoards(state: ReturnType<BoardStore['getSnapshot']>): Record<'decision' | 'executing' | 'recent', number> {
+  const countOf = (id: 'decision' | 'executing' | 'recent'): number => {
+    const board = state.board.buckets.find(candidate => candidate.id === id)
+    return board === undefined ? 0 : board.entries.length
+  }
+  return { decision: countOf('decision'), executing: countOf('executing'), recent: countOf('recent') }
+}
+
+/** Accessible name that states every count, since the row is icon+text only. */
+export function describeCounts(
+  translate: ReturnType<typeof createTranslate>,
+  counts: Record<'decision' | 'executing' | 'recent', number>,
+): string {
+  return [
+    translate('panel.title'),
+    `${translate('bucket.decision')} ${counts.decision}`,
+    `${translate('bucket.executing')} ${counts.executing}`,
+    `${translate('bucket.recent')} ${counts.recent}`,
+  ].join('，')
+}
+
+/**
+ * Compact count string for the nav row's label.
+ *
+ * The row has no slot for a badge — the framework draws the label as text — so
+ * the numbers have to be part of the label. Ordered decision, executing, recent
+ * and separated by a middle dot so the three figures stay distinguishable at a
+ * glance without any colour.
+ */
+export function describeCountsShort(
+  _translate: ReturnType<typeof createTranslate>,
+  state: ReturnType<BoardStore['getSnapshot']>,
+): string {
+  const counts = countBoards(state)
+  return `${counts.decision} · ${counts.executing} · ${counts.recent}`
+}
+
+/**
+ * The sidebar-foot readout.
+ *
+ * Kept for the collapsed rail, where the nav list is not rendered and the only
+ * seat left is the foot action. It degrades to glyph plus decision count.
  */
 export function BoardTrigger({
   controller,
@@ -216,9 +319,17 @@ export function BoardOverlay({
       const target = event.target
       if (!(target instanceof Node)) return
       if (panelRef.current?.contains(target) === true) return
-      // The trigger owns its own toggle; treating its press as "outside" would
-      // close and immediately reopen the panel.
-      if (target instanceof Element && target.closest('.status-board__trigger') !== null) return
+      // The entry owns its own toggle; treating its press as "outside" would
+      // close and immediately reopen the panel. Both forms are checked: the
+      // nav row (marked by `BoardNavEntry`) and the foot strip.
+      if (
+        target instanceof Element &&
+        (target.closest('.status-board__trigger') !== null ||
+          target.closest('.status-board__strip') !== null ||
+          target.closest('[data-status-board-entry]') !== null)
+      ) {
+        return
+      }
       close()
     }
     document.addEventListener('pointerdown', onPointerDown)
