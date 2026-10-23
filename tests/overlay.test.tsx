@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { BoardOverlay, BoardTrigger, createOverlayController } from '../src/client/overlay.tsx'
+import { BoardNavEntry, BoardOverlay, createOverlayController } from '../src/client/overlay.tsx'
 import { buildBoard } from '../src/shared/board.ts'
 import { CONFIG_DEFAULTS } from '../src/shared/config.ts'
 import type { BoardState, BoardStore } from '../src/client/store.ts'
@@ -19,10 +19,6 @@ import type { SessionSignal } from '../src/shared/types.ts'
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0)
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-function signal(id: string, extra: Partial<SessionSignal> = {}): SessionSignal {
-  return { id, title: id, running: false, awaitingDecision: false, lastActivityAt: NOW - 60_000, ...extra }
-}
 
 function makeStore(signals: readonly SessionSignal[]): BoardStore {
   const state: BoardState = {
@@ -59,7 +55,11 @@ function mount(element: ReturnType<typeof createElement>): HTMLElement {
   return container
 }
 
-/** Render trigger and overlay together, as the two slot registrations do. */
+/**
+ * Render the overlay with a nav-row stand-in, as the two slot registrations do
+ * in the real shell: `BoardNavEntry` draws the row and opens the board, and
+ * `BoardOverlay` renders the panel.
+ */
 function mountPair(store: BoardStore, controller = createOverlayController()) {
   const container = document.createElement('div')
   document.body.append(container)
@@ -70,7 +70,11 @@ function mountPair(store: BoardStore, controller = createOverlayController()) {
         createElement(
           'div',
           null,
-          createElement(BoardTrigger, { controller, store, wide: true }),
+          createElement(
+            'button',
+            { type: 'button', 'data-status-board-entry': 'true' },
+            createElement(BoardNavEntry, { controller, store, size: 16 }),
+          ),
           createElement(BoardOverlay, { controller, store, resolveNavigation: () => undefined }),
         ),
       ),
@@ -108,47 +112,6 @@ describe('createOverlayController', () => {
     off()
     controller.toggle()
     expect(seen).not.toHaveBeenCalled()
-  })
-})
-
-describe('BoardTrigger', () => {
-  it('reports its expanded state and points at the panel it controls', () => {
-    const store = makeStore([])
-    const controller = createOverlayController()
-    const container = mount(createElement(BoardTrigger, { controller, store, wide: true }))
-    const button = container.querySelector('button')
-    expect(button?.getAttribute('aria-expanded')).toBe('false')
-    // The ARIA IDREF must resolve once the panel opens; a dangling one is the
-    // classic disclosure bug.
-    expect(button?.getAttribute('aria-controls')).toBeTruthy()
-  })
-
-  it('reads out all three counts in the wide sidebar', () => {
-    const store = makeStore([
-      signal('a', { awaitingDecision: true }),
-      signal('b', { running: true }),
-      signal('c', { running: true }),
-      signal('d', {}),
-    ])
-    const controller = createOverlayController()
-    const container = mount(createElement(BoardTrigger, { controller, store, wide: true }))
-    // Option A: the entry is a readout, so every non-empty board contributes a
-    // metric — the point is knowing the state without opening the panel.
-    expect(container.querySelectorAll('.status-board__metric')).toHaveLength(3)
-    expect(container.querySelector('[data-metric="decision"]')?.textContent).toBe('1')
-    expect(container.querySelector('[data-metric="executing"]')?.textContent).toBe('2')
-    // The counts are stated once, in the trigger's accessible name.
-    expect(container.querySelector('button')?.getAttribute('aria-label')).toContain('Needs my decision 1')
-  })
-
-  it('collapses to the glyph plus the decision count in the 56px rail', () => {
-    // The rail has no room for a strip; overflowing it would break the column.
-    // The decision count is the one number worth keeping.
-    const store = makeStore([signal('a', { awaitingDecision: true }), signal('b', { running: true })])
-    const controller = createOverlayController()
-    const container = mount(createElement(BoardTrigger, { controller, store, wide: false }))
-    expect(container.querySelector('.status-board__strip')).toBeNull()
-    expect(container.querySelector('.status-board__trigger-count')?.textContent).toBe('1')
   })
 })
 

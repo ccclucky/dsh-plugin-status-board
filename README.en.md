@@ -54,7 +54,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 1. Open the DSH Web UI → **Settings → Plugins**.
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
-3. Reload the page. A board icon appears in the sidebar footer; click it to open the panel.
+3. Reload the page. A **Session Status Board** row appears in the sidebar nav list, right under the shipped rows, followed by three counts (decision · running · recent). Click the row and the board opens beside it; press `Esc`, click outside the panel, or use its × to dismiss.
 
 ### Option 2 — CLI, from npm (recommended for scripted setups)
 
@@ -137,8 +137,8 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
                                        │                         ▼    │
                                        │     classify / sort / cap    │
                                        │                         ▼    │
-                                       │  sidebar.panellist → icon    │
-                                       │  main(key=...)     → panel   │
+                                       │  sidebar.panellist → nav row  │
+                                       │  shell.overlay    → panel     │
                                        └──────────────────────────────┘
 ```
 
@@ -155,7 +155,7 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 168 cases
+pnpm test        # vitest, 182 cases
 pnpm build       # clean → declarations → both halves → Client envelope wrap → self-check
 pnpm verify      # artefact self-check only (run pnpm build first)
 pnpm test:watch  # watch mode
@@ -174,13 +174,14 @@ dsh-plugin-status-board/
 │   │   ├── route.ts             #   cross-process constants
 │   │   └── types.ts             #   shared type contract
 │   └── client/
-│       ├── index.tsx            # slot registration (icon + panel + styles + dicts)
+│       ├── index.tsx            # slot registration (nav row + overlay + dicts)
+│       ├── overlay.tsx          # nav-row entry + floating panel (click trap, anchoring, dismissal)
 │       ├── Panel.tsx            # the three-board view
 │       ├── store.ts             # external store (useSyncExternalStore)
 │       ├── session-source.ts    # the single runtime-snapshot adapter
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 168 unit tests
+├── tests/                       # 182 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.ts             # two independent builds
@@ -196,6 +197,8 @@ dsh-plugin-status-board/
 | `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, malformed rows |
 | `store.test.ts` | subscriptions, change detection, collapse persistence, late config must not clobber a click |
 | `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens |
+| `overlay.test.tsx` | panel open/close, Escape and outside-press dismissal, focus into the panel, controller semantics |
+| `nav-entry.test.tsx` | the row swallows its own click (no navigation), count description, framework handler restored on unmount |
 | `host.test.ts` | GET/HEAD/405 handling, Allow header, effect cleanup, late-mounting webServer |
 | `manifest.test.ts` | manifest / patch / locale / icon / MIT LICENSE consistency |
 | `artifacts.test.ts` | built output: real Host exports, Client envelope, external React, inlined dicts, unrewritten styles |
@@ -208,7 +211,9 @@ dsh-plugin-status-board/
 The board lists top-level sessions only. Sessions spawned as **subagent children** (`origin: 'subagent'`, or a row carrying a parent id) are already reflected on their parent, and a **blank** session that never exchanged a message has no state to report — its default title is just the workspace name, which reads as a phantom row.
 
 **A session is on "Needs my decision" but it is still running — why?**
-By design. "The agent is still working" and "it cannot proceed without your call" can both be true, and the second one is the blocker. The decision is derived from two real runtime projections: `userQuestions.active` (a tool waiting for the human, plan review included) and `agentTeam.tasks` (a ready, unclaimed team task).
+By design. "The agent is still working" and "it cannot proceed without your call" can both be true, and the second one is the blocker. The decision is derived from one runtime projection: `userQuestions.active` (a tool waiting for the human, plan review included).
+
+Team-task `pending` rows deliberately play no part: on disk a task row carries only `id/revision/subject/status` (there is no `ready` field), and a finished ticket keeps its rows `pending` forever. An earlier version keyed on them and pinned sessions that had ended days earlier to the decision board.
 
 **What happens when I click a session row?**
 It navigates through the Harness `uiWorkspace.openSession` service. When that service is not part of the composition, rows render as static text rather than as buttons that do nothing.

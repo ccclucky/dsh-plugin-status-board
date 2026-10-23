@@ -28,7 +28,7 @@
 
 import { createElement, type ReactElement } from 'react'
 import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
-import { createOverlayController, BoardNavEntry, BoardOverlay, BoardTrigger, describeCountsShort } from './overlay.tsx'
+import { createOverlayController, BoardNavEntry, BoardOverlay, describeCountsShort } from './overlay.tsx'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
@@ -187,19 +187,11 @@ export function apply(ctx: ClientContext): void {
     return `${translate('panel.title')} · ${describeCountsShort(translate, state)}`
   }
 
-  // The foot action stays for the collapsed rail, where the nav list is gone.
-  const FootAction = ({ wide }: { wide: boolean }): ReactElement =>
-    createElement(BoardTrigger, { controller, store, wide })
-
   const Overlay = (): ReactElement | null =>
     createElement(BoardOverlay, { controller, store, resolveNavigation })
 
   ctx.slots.inject('sidebar.panellist', () =>
     ctx.slots.register({ name: 'sidebar.panellist', id: 'status-board', order: 20, label: navLabel }, NavEntry),
-  )
-
-  ctx.slots.inject('sidebar.footer.action', () =>
-    ctx.slots.register({ name: 'sidebar.footer.action', id: 'status-board', order: 20 }, FootAction),
   )
 
   ctx.slots.inject('shell.overlay', () =>

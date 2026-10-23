@@ -30,6 +30,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   useSyncExternalStore,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -176,112 +177,18 @@ export function describeCountsShort(
   return `${counts.decision} · ${counts.executing} · ${counts.recent}`
 }
 
-/**
- * The sidebar-foot readout.
- *
- * Kept for the collapsed rail, where the nav list is not rendered and the only
- * seat left is the foot action. It degrades to glyph plus decision count.
- */
-export function BoardTrigger({
-  controller,
-  store,
-  wide,
-}: {
-  readonly controller: OverlayController
-  readonly store: BoardStore
-  readonly wide: boolean
-}): ReactElement {
-  const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-  const translate = createTranslate(state.locale)
-  const panelId = `status-board-overlay-${useId()}`
-  const label = translate('panel.title')
-
-  // Three counts rather than one badge: the strip is a readout, so it answers
-  // "what is going on" without being opened. Counted from the same board the
-  // panel renders, so the two can never disagree.
-  const countOf = (id: 'decision' | 'executing' | 'recent'): number => {
-    const board = state.board.buckets.find(candidate => candidate.id === id)
-    return board === undefined ? 0 : board.entries.length
-  }
-  const decision = countOf('decision')
-  const executing = countOf('executing')
-  const recent = countOf('recent')
-
-  const aria = [
-    label,
-    `${translate('bucket.decision')} ${decision}`,
-    `${translate('bucket.executing')} ${executing}`,
-    `${translate('bucket.recent')} ${recent}`,
-  ].join('，')
-
-  // The rail is 56px wide: there is no room for a label, so it degrades to the
-  // glyph plus the decision count, which is the one number worth keeping.
-  if (!wide) {
-    return (
-      <button
-        type="button"
-        className="status-board__trigger"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label={aria}
-        title={aria}
-        data-open={open}
-        onClick={() => controller.toggle()}
-      >
-        <BoardGlyph size={16} />
-        {decision > 0 ? (
-          <span className="status-board__trigger-count" aria-hidden="true">
-            {decision}
-          </span>
-        ) : null}
-      </button>
-    )
-  }
-
-  // The sidebar foot renders this beside the settings control, so the space is
-  // whatever is left over — often under 90px. A label there wraps to two lines
-  // and reads as gibberish ("会话状态看板45"), so the foot form is counts only:
-  // the glyph identifies it, `aria-label`/`title` carry the words, and the three
-  // metrics stay on one line because they never shrink.
-  return (
-    <button
-      type="button"
-      className="status-board__strip"
-      aria-expanded={open}
-      aria-controls={panelId}
-      aria-label={aria}
-      title={aria}
-      data-open={open}
-      onClick={() => controller.toggle()}
-    >
-      <span className="status-board__strip-glyph" aria-hidden="true">
-        <BoardGlyph size={14} />
-      </span>
-      <span className="status-board__strip-metrics" aria-hidden="true">
-        <span className="status-board__metric" data-metric="decision">
-          <span className="status-board__metric-dot" />
-          {decision}
-        </span>
-        <span className="status-board__metric" data-metric="executing">
-          <span className="status-board__metric-dot" />
-          {executing}
-        </span>
-        <span className="status-board__metric" data-metric="recent">
-          <span className="status-board__metric-dot" />
-          {recent}
-        </span>
-      </span>
-    </button>
-  )
-}
 
 /**
  * The floating board.
  *
- * `shell.overlay` is a click-through layer, so this root opts back into pointer
- * events. The panel is positioned against the sidebar's left edge and grows
- * rightwards, which keeps it near the trigger that opened it.
+ * `shell.overlay` is a click-through layer covering the whole frame, so this
+ * root opts back into pointer events.
+ *
+ * Position: measured from the entry's row when it opens, so the panel appears
+ * beside the row that was clicked rather than at a fixed spot in the frame. A
+ * fixed anchor looked like the panel came from nowhere — the entry sits near the
+ * top of the sidebar, and the first cut had it pinned to the bottom of the
+ * window.
  */
 export function BoardOverlay({
   controller,
@@ -342,6 +249,30 @@ export function BoardOverlay({
     if (open) panelRef.current?.focus()
   }, [open])
 
+  // Anchor the panel beside the entry row. Measured on open (and on resize)
+  // because the row's position depends on the sidebar's own layout: the shipped
+  // nav rows above it, the fold state, and the window height all move it.
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
+  useEffect(() => {
+    if (!open) {
+      setAnchor(null)
+      return undefined
+    }
+    const place = (): void => {
+      const row = document.querySelector<HTMLElement>('[data-status-board-entry]')
+      if (row === null) return
+      const rect = row.getBoundingClientRect()
+      // Open beside the sidebar, aligned to the row's top edge. Clamped so a
+      // short window cannot push the panel off the bottom.
+      const panelHeight = panelRef.current?.offsetHeight ?? 360
+      const maxTop = Math.max(8, window.innerHeight - panelHeight - 8)
+      setAnchor({ left: Math.max(8, rect.right + 6), top: Math.min(Math.max(8, rect.top), maxTop) })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [open])
+
   if (!open) return null
 
   const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
@@ -349,8 +280,6 @@ export function BoardOverlay({
   return (
     <div
       className="status-board__overlay-root"
-      // The layer is click-through by design; this entry claims its own pixels.
-      style={{ pointerEvents: 'auto' }}
       // Stop a press inside the board from reaching the outside-click handler of
       // any other overlay entry.
       onMouseDown={(event: ReactMouseEvent) => event.stopPropagation()}
@@ -362,6 +291,9 @@ export function BoardOverlay({
         aria-label={translate('panel.title')}
         ref={panelRef}
         tabIndex={-1}
+        // Anchored to the measured row; falls back to the layer's own padding
+        // before the first measurement lands (one frame).
+        style={anchor === null ? undefined : { position: 'fixed', left: anchor.left, top: anchor.top }}
       >
         <div className="status-board__overlay-bar">
           <span className="status-board__overlay-title">{translate('panel.title')}</span>

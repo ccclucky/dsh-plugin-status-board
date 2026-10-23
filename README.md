@@ -54,7 +54,7 @@
 
 1. 打开 DSH Web UI → **Settings → Plugins**。
 2. 选择 **Install bundle**，填入本包的**绝对路径**（本地目录安装）或包名（已发布到 npm 时）。
-3. 安装完成后刷新页面，侧栏底部会出现看板图标，点击即可打开面板。
+3. 安装完成后刷新页面，侧栏导航区（「自动化任务」下方）会出现**会话状态看板**一行，后面跟着三个计数（待决策 · 执行中 · 近期）。点击该行即在侧栏右侧弹出看板；按 `Esc`、点面板外或点面板右上角 × 均可收起。
 
 ### 方式二：命令行（从 npm 安装，推荐脚本化场景）
 
@@ -137,8 +137,8 @@ lib/
                                        │                ▼              │
                                        │      分类 / 排序 / 截断        │
                                        │                ▼              │
-                                       │   sidebar.panellist → 图标    │
-                                       │   main(key=...)     → 面板    │
+                                       │   sidebar.panellist → 导航行   │
+                                       │   shell.overlay    → 浮层看板  │
                                        └──────────────────────────────┘
 ```
 
@@ -155,7 +155,7 @@ lib/
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit，strict + exactOptionalPropertyTypes
-pnpm test        # vitest，168 个用例
+pnpm test        # vitest，182 个用例
 pnpm build       # 清理 → 声明文件 → 两半部打包 → Client 信封包装 → 产物自检
 pnpm verify      # 只跑构建产物自检（需先 build）
 pnpm test:watch  # 监听模式
@@ -174,13 +174,14 @@ dsh-plugin-status-board/
 │   │   ├── route.ts             #   跨进程常量（路由路径、marker）
 │   │   └── types.ts             #   共享类型契约
 │   └── client/
-│       ├── index.tsx            # 插槽注册（图标 + 面板 + 样式 + 字典）
+│       ├── index.tsx            # 插槽注册（导航行 + 浮层 + 字典）
+│       ├── overlay.tsx          # 导航行入口 + 浮层容器（含点击拦截、定位、收起）
 │       ├── Panel.tsx            # 三看板视图
 │       ├── store.ts             # 外部 store（useSyncExternalStore）
 │       ├── session-source.ts    # 运行时快照 → 分类输入的唯一适配点
 │       └── styles.ts            # 主题令牌驱动的样式
 ├── locale/{zh,en}.json          # 界面文案 + 插件管理页元数据
-├── tests/                       # 168 个单元测试
+├── tests/                       # 182 个单元测试
 ├── scripts/                     # 清理与 Client 信封包装
 ├── cordis.patch.yml             # bundle 补丁（含默认配置）
 └── tsdown.config.ts             # 两半部独立构建
@@ -196,6 +197,8 @@ dsh-plugin-status-board/
 | `session-source.test.ts` | 运行时快照适配、子会话/空白会话过滤、决策投影读取、异常行容错 |
 | `store.test.ts` | 订阅通知、变更检测、折叠持久化、配置晚到不覆盖用户选择、卸载语义 |
 | `panel.test.tsx` | 服务端渲染：三看板、折叠、aria 关系可解析、加载/空/错误态、主题令牌 |
+| `overlay.test.tsx` | 浮层开关、Esc/外部点击收起、焦点进入面板、控制器通知语义 |
+| `nav-entry.test.tsx` | 导航行拦截点击（不触发跳转）、计数描述、卸载后还原框架行为 |
 | `host.test.ts` | 配置路由 GET/HEAD/405、Allow 头、effect 清理、webServer 延迟挂载 |
 | `manifest.test.ts` | 清单/补丁/locale/图标/MIT/LICENSE 一致性 |
 | `artifacts.test.ts` | 构建产物：Host 真实导出、Client 信封、React 外置、字典内联、样式未被改写 |
@@ -208,7 +211,9 @@ dsh-plugin-status-board/
 看板只列出**顶层**会话：子 Agent 派生的会话（`origin: 'subagent'` 或带父会话 id 的行）已体现在父会话上；从未交换过消息的空白会话也没有状态可报，且其默认标题就是工作区名，容易读成幽灵行。这样列出的才是「你真正在对话的会话」。
 
 **为什么某会话在「待我决策」里但它其实还在跑？**
-这是刻意设计。「Agent 仍在跑」和「它在等你拍板才能继续」可以同时成立，后者更重要——它才是阻塞点。判定读取的是运行时的两个真实投影：`userQuestions.active`（工具正在等待用户回答，含计划审阅）与 `agentTeam.tasks`（存在「已就绪且待认领」的团队任务）。
+这是刻意设计。「Agent 仍在跑」和「它在等你拍板才能继续」可以同时成立，后者更重要——它才是阻塞点。判定只读取运行时的 `userQuestions.active` 投影（`ask_user_question` 工具正等待人工回答，含计划审阅）。
+
+团队任务的 `pending` 状态**不参与判定**：实测持久化日志里一条明确记录只有 `id/revision/subject/status`，没有 `ready` 字段，而工单结束后其任务行会永远停留在 `pending`。早先版本按它判定，结果把六天前就完成的会话钉在了「待我决策」上。
 
 **点击会话行会怎样？**
 通过 Harness 的 `uiWorkspace.openSession` 跳到该会话。若当前配置未提供该服务，行会渲染成静态文本而不是可点按钮——界面不会给出点不动的假按钮。

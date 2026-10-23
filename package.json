@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-status-board",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Status-based session board plugin for DeepSeek Harness",
   "license": "MIT",
   "author": "CCLUCKY",
@@ -50,6 +50,7 @@
     "cordis.patch.yml",
     "README.md",
     "README.en.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "dsh": {

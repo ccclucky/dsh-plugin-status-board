@@ -496,22 +496,27 @@ button.status-board__row:active {
 
 /* ── Floating board ──────────────────────────────────────────────────────── */
 
+/* The layer spans the frame and is click-through; the panel inside it is
+   positioned from the measured entry row (see BoardOverlay), so this container
+   only supplies the pointer-events root and a corner fallback. */
 .status-board__overlay-root {
   position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
-  /* Bottom-aligned: the trigger lives at the sidebar foot, so the board opens
-     upward from it instead of appearing far away at the top of the window. */
-  align-items: flex-end;
-  padding: 44px 0 44px 12px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0;
+  pointer-events: none;
 }
 
 .status-board__overlay {
   display: flex;
   flex-direction: column;
   width: 304px;
+  /* The panel is the only part of this entry that takes pointer events: the
+     container spans the frame so the panel can be placed anywhere in it, and a
+     container that accepted clicks would make the whole app unclickable. */
+  pointer-events: auto;
   /* Bounded, not stretched: the panel is as tall as its content until the list
      grows past the viewport. */
   max-height: calc(100vh - 96px);
