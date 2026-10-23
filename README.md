@@ -25,13 +25,25 @@
 | :--- | :--- | :--- |
 | **待我决策** | 会话的 `userQuestions` 投影里有仍待回答的 `ask_user_question`（含计划审阅） | 「我现在必须处理什么？」 |
 | **正在执行** | 会话的 Agent 正在干活，且不需要用户介入 | 「后台在跑什么？」 |
-| **近期记录** | 其余会话中，在时间窗口内有活动的 | 「最近动过什么？」 |
+| **近期记录** | 其余会话中，在默认 7 天窗口内有活动的 | 「最近动过什么？」 |
 
 判定顺序是**排他的**：一个会话只会出现在一块看板里。这也正是它相对原生侧栏列表的价值——原生列表按工作区/时间排列，看不出「谁在等我」；看板按**行动优先级**排列。
 
-> **演示占位**
-> 截图/GIF 待补充：`docs/demo/demo-light.png`（浅色主题）、`docs/demo/demo-dark.png`（深色主题）、`docs/demo/demo-collapse.gif`（折叠交互）。
-> 侧栏树是单列嵌套目录；浮窗看板固定单列，宽屏下约 380px。
+## 界面
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-board.png" alt="侧栏目录树与浮窗看板" width="820">
+</p>
+
+| 目录树 + 悬浮胶囊 | 浮窗决策题卡（演示数据） |
+| :---: | :---: |
+| ![侧栏目录树](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-tree.png) | ![决策题卡](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-card.png) |
+
+| 深色主题 | 展开 / 打开 / 收起 |
+| :---: | :---: |
+| ![深色主题](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/dark-board.png) | ![交互](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/demo-collapse.gif) |
+
+> 侧栏 3 个状态目录；右下角胶囊打开完整看板。目录标记静止，会话行在待决策/进行中时呼吸或脉冲。
 
 ---
 

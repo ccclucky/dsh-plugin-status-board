@@ -25,13 +25,25 @@
 | :--- | :--- | :--- |
 | **Needs my decision** | The session has an unanswered `ask_user_question` in its `userQuestions` projection (plan review included) | “What must I handle now?” |
 | **Running** | The agent is working and needs nothing from you | “What is running in the background?” |
-| **Recent records** | Everything else that saw activity inside the time window | “What moved recently?” |
+| **Recent records** | Everything else that saw activity inside the default 7-day window | “What moved recently?” |
 
 Classification is **exclusive**: one session appears on exactly one board. That is the point — the native sidebar sorts by workspace and time, so it cannot tell you *who is waiting on you*; this board sorts by **action priority**.
 
-> **Demo placeholders**
-> Screenshots/GIF pending: `docs/demo-light.png`, `docs/demo-dark.png`, `docs/demo-collapse.gif`.
-> The sidebar tree is a single nested column; the floating board is a fixed single column, about 380px wide.
+## Screenshots
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-board.png" alt="Sidebar tree and floating board" width="820">
+</p>
+
+| Sidebar tree + pill | Decision card (demo data) |
+| :---: | :---: |
+| ![Sidebar tree](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-tree.png) | ![Decision card](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-card.png) |
+
+| Dark theme | Expand / open / collapse |
+| :---: | :---: |
+| ![Dark theme](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/dark-board.png) | ![Interaction](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/demo-collapse.gif) |
+
+> Three status folders in the sidebar; the bottom-right pill opens the full board. Folder marks are static; session rows breathe or pulse while a decision or run is live.
 
 ---
 
