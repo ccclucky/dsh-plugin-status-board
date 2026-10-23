@@ -28,7 +28,7 @@
 import { useEffect, useId, useState, useSyncExternalStore, type CSSProperties, type ReactElement } from 'react'
 import { BUCKET_IDS, type BucketId, type BoardEntry } from '../shared/types.ts'
 import { bucketToggleLabel, isCollapsed, totalRows } from '../shared/board.ts'
-import { createTranslate, formatRelativeTime, type MessageKey, type Translate } from '../shared/i18n.ts'
+import { createTranslate, formatRelativeTime, recentWindowHint, type MessageKey, type Translate } from '../shared/i18n.ts'
 import type { BoardState, BoardStore } from './store.ts'
 import { QuestionCard, type AnswerQuestion } from './QuestionCard.tsx'
 import { StatusMark } from './StatusMark.tsx'
@@ -249,7 +249,9 @@ function Bucket({
   const collapsed = isCollapsed(state.collapse, id)
   const count = visible.length
   const name = translate(`bucket.${id}` as MessageKey)
-  const hint = translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
+  const hint = id === 'recent'
+    ? recentWindowHint(state.board.windowHours, translate)
+    : translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
   const empty = translate(`bucket.${id}Empty` as MessageKey)
   const filtering = query.trim().length > 0
 

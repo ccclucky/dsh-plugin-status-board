@@ -23,7 +23,8 @@
     "recentUnit": "recent",
     "decisionEmpty": "Nothing waiting on you",
     "executingEmpty": "Nothing running",
-    "recentEmpty": "No recent activity"
+    "recentEmpty": "No recent activity",
+    "recentHintDays": "Active in the last {days} days"
   },
   "state": {
     "loading": "Reading sessions…",

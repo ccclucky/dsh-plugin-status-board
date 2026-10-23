@@ -120,7 +120,7 @@ export function buildBoard(
     buckets[classifySession(signal)].push(signal)
   }
 
-  const windowHours = clampToRange(config.recentWindowHours, 1, 720, 24)
+  const windowHours = clampToRange(config.recentWindowHours, 1, 720, 168)
   const maxRecent = clampToRange(config.maxRecent, 1, 200, 20)
 
   const decision = [...buckets.decision].sort(compareByRecency).map(toEntry)

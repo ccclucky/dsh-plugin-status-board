@@ -111,7 +111,7 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
     - id: status-board
       name: 'dsh-plugin-status-board'
       config:
-        recentWindowHours: 24
+        recentWindowHours: 168
         maxRecent: 20
         defaultCollapsed: recent
         showEmptyBuckets: true
@@ -119,7 +119,7 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
 
 | Option | Type | Default | Range | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `recentWindowHours` | number | `24` | 1 – 720 | Width of the "Recent records" window, in hours. Sessions older than this are excluded from that board. |
+| `recentWindowHours` | number | `168` | 1 – 720 | Width of the "Recent records" window, in hours; the default is 7 days. Sessions older than this are excluded from that board. |
 | `maxRecent` | number | `20` | 1 – 200 | Maximum rows on the "Recent records" board. The overflow is reported at the board's foot as “N older sessions are hidden”. |
 | `defaultCollapsed` | string | `recent` | `decision` / `executing` / `recent` / `none` / `all` | Which board(s) start collapsed on first load. Once the user toggles a board, their choice wins. |
 | `showEmptyBuckets` | boolean | `true` | `true` / `false` | Whether an empty board still renders its header. `false` hides empty boards entirely. |

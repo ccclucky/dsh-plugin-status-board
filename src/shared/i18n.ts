@@ -38,6 +38,8 @@ export interface LocaleFile {
     readonly decisionHint: string
     readonly executingHint: string
     readonly recentHint: string
+    /** Day-scale variant used when the configured window is a whole number of days. */
+    readonly recentHintDays: string
     readonly empty: string
     readonly expand: string
     readonly collapse: string
@@ -241,6 +243,15 @@ export function createTranslate(active: string | undefined): Translate {
     const text = lookup(primary, key) ?? lookup(fallback, key) ?? key
     return formatMessage(text, params)
   }
+}
+
+/**
+ * Describe the "recent records" window without making the user read 168 hours.
+ * Whole days use the day form; smaller windows keep the hour form.
+ */
+export function recentWindowHint(hours: number, translate: Translate): string {
+  if (hours >= 24 && hours % 24 === 0) return translate('bucket.recentHintDays', { days: hours / 24 })
+  return translate('bucket.recentHint', { hours })
 }
 
 /** One hour in milliseconds (relative-time formatting). */

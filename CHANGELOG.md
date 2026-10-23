@@ -45,6 +45,9 @@ an inline navigation tree, and a compact floating button opens the full board.
   matters: a hollow amber ring breathes on a decision, a blue arc pulses on
   work in flight, and history stays still. Nothing rotates, and motion switches
   off under `prefers-reduced-motion`.
+- **The recent-records window is 7 days by default** (168 hours, previously
+  24). The hint prints "last 7 days" rather than "last 168 hours" when the
+  window is a whole number of days.
 
 ### Fixed
 

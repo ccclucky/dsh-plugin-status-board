@@ -23,7 +23,8 @@
     "recentUnit": "条近期记录",
     "decisionEmpty": "没有等你拍板的事",
     "executingEmpty": "没有正在执行的会话",
-    "recentEmpty": "近期没有动静"
+    "recentEmpty": "近期没有动静",
+    "recentHintDays": "最近 {days} 天内有动静"
   },
   "state": {
     "loading": "正在读取会话…",

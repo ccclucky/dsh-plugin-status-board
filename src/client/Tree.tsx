@@ -19,7 +19,7 @@
 import { useSyncExternalStore, type ReactElement } from 'react'
 import { BUCKET_IDS, type BoardEntry, type BucketId } from '../shared/types.ts'
 import { bucketToggleLabel, isCollapsed } from '../shared/board.ts'
-import { createTranslate, formatRelativeTime, type Translate } from '../shared/i18n.ts'
+import { createTranslate, formatRelativeTime, recentWindowHint, type Translate } from '../shared/i18n.ts'
 import type { BoardStore } from './store.ts'
 import { Chevron, useRelativeClock } from './Panel.tsx'
 import { StatusMark } from './StatusMark.tsx'
@@ -103,7 +103,9 @@ function TreeFolder({
   if (board === undefined) return null
   const collapsed = isCollapsed(state.collapse, id)
   const name = translate(`bucket.${id}`)
-  const hint = translate(`bucket.${id}Hint`, { hours: state.board.windowHours })
+  const hint = id === 'recent'
+    ? recentWindowHint(state.board.windowHours, translate)
+    : translate(`bucket.${id}Hint`, { hours: state.board.windowHours })
   const empty = translate(`bucket.${id}Empty`)
   const count = board.entries.length
   const regionId = `status-board-tree-region-${id}`

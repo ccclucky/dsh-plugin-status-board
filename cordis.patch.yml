@@ -14,7 +14,7 @@
     - id: status-board
       name: 'dsh-plugin-status-board'
       config:
-        recentWindowHours: 24
+        recentWindowHours: 168
         maxRecent: 20
         defaultCollapsed: recent
         showEmptyBuckets: true

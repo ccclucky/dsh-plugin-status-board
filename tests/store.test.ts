@@ -23,7 +23,7 @@ const NOW = 1_700_000_000_000
 
 /** The documented defaults, spelled out so a default change fails loudly. */
 function defaults(): ResolvedStatusBoardConfig {
-  return { recentWindowHours: 24, maxRecent: 20, defaultCollapsed: 'recent', showEmptyBuckets: true }
+  return { recentWindowHours: 168, maxRecent: 20, defaultCollapsed: 'recent', showEmptyBuckets: true }
 }
 
 /** A session list whose contents the test can publish later. */
@@ -271,7 +271,7 @@ describe('createBoardStore', () => {
     const { store } = build({ loadConfig: () => Promise.reject(new Error('offline')) })
     await Promise.resolve()
     await Promise.resolve()
-    expect(store.getSnapshot().config.recentWindowHours).toBe(24)
+    expect(store.getSnapshot().config.recentWindowHours).toBe(168)
     store.dispose()
   })
 

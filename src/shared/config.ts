@@ -19,7 +19,7 @@ export const CONFIG_LIMITS = {
 
 /** Defaults documented in README.md and used when a field is absent. */
 export const CONFIG_DEFAULTS = {
-  recentWindowHours: 24,
+  recentWindowHours: 168,
   maxRecent: 20,
   defaultCollapsed: 'recent' as CollapseMode,
   showEmptyBuckets: true,

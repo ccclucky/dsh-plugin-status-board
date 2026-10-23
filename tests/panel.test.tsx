@@ -26,7 +26,7 @@ const NOW = 1_700_000_000_000
 
 /** The documented defaults, spelled out so a default change fails loudly. */
 const DEFAULTS: ResolvedStatusBoardConfig = {
-  recentWindowHours: 24,
+  recentWindowHours: 168,
   maxRecent: 20,
   defaultCollapsed: 'recent',
   showEmptyBuckets: true,

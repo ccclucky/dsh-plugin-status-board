@@ -111,7 +111,7 @@ lib/
     - id: status-board
       name: 'dsh-plugin-status-board'
       config:
-        recentWindowHours: 24
+        recentWindowHours: 168
         maxRecent: 20
         defaultCollapsed: recent
         showEmptyBuckets: true
@@ -119,7 +119,7 @@ lib/
 
 | 配置项 | 类型 | 默认值 | 取值范围 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `recentWindowHours` | number | `24` | 1 – 720 | 「近期记录」看板的时间窗口（小时）。超出窗口的会话不进入该看板。 |
+| `recentWindowHours` | number | `168` | 1 – 720 | 「近期记录」看板的时间窗口（小时），默认 7 天；超出窗口的会话不进入该看板。 |
 | `maxRecent` | number | `20` | 1 – 200 | 「近期记录」看板最多显示的行数；超出部分在看板底部提示「另有 N 个较早会话未显示」。 |
 | `defaultCollapsed` | string | `recent` | `decision` / `executing` / `recent` / `none` / `all` | 初次加载时哪块看板处于折叠状态。用户一旦手动折叠过，以用户选择为准。 |
 | `showEmptyBuckets` | boolean | `true` | `true` / `false` | 空看板是否仍渲染标题栏。设为 `false` 时，没有会话的看板整体隐藏。 |
