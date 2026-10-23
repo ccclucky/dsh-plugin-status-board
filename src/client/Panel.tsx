@@ -227,17 +227,14 @@ function Bucket({
           title={hint}
           onClick={() => store.toggle(id)}
         >
-          <span className="status-board__name">
-            <Chevron collapsed={collapsed} />
-            <span className="status-board__name-text">{name}</span>
-          </span>
-          {/* The count is the readout, so it is drawn at reading size with its
-              unit rather than as a pill: "1 waiting on you" is a sentence, a
-              badge is a decoration. Hidden from AT because the toggle's
-              accessible name already states the number. */}
-          <span className="status-board__readout" aria-hidden="true">
-            <span className="status-board__readout-n">{count}</span>
-            <span className="status-board__readout-u">{unit}</span>
+          <Chevron collapsed={collapsed} />
+          <span className="status-board__name-text">{name}</span>
+          {/* Small count on the header itself; the decision board additionally
+              gets the large readout below, because that is the one board whose
+              size is worth spending. The toggle's accessible name already states
+              the number, so this is hidden from AT. */}
+          <span className="status-board__count" aria-hidden="true">
+            {count}
           </span>
         </button>
       </h2>
@@ -245,6 +242,19 @@ function Bucket({
           real element (ARIA requires IDREFs to resolve). `role="group"`, not
           `role="region"`: the module is already a landmark. */}
       <div id={regionId} role="group" aria-label={name} hidden={collapsed}>
+        {/* Only the decision board states its size in words: it is the one that
+            asks the user to act, so it earns the emphasis. The other two are
+            lists the user scans, and a big number there would compete with the
+            rows they are trying to read. */}
+        {id === 'decision' && count > 0 ? (
+          <>
+            <p className="status-board__metric" aria-hidden="true">
+              <span className="status-board__metric-n">{count}</span>
+              <span className="status-board__metric-u">{unit}</span>
+            </p>
+            <div className="status-board__rule" aria-hidden="true" />
+          </>
+        ) : null}
         {loading ? null : count === 0 ? (
           <p className="status-board__empty">{translate('bucket.empty')}</p>
         ) : (

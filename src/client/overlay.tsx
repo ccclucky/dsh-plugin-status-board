@@ -104,7 +104,6 @@ export function BoardTrigger({
   const decision = countOf('decision')
   const executing = countOf('executing')
   const recent = countOf('recent')
-  const total = decision + executing + recent
 
   const aria = [
     label,
@@ -137,6 +136,11 @@ export function BoardTrigger({
     )
   }
 
+  // The sidebar foot renders this beside the settings control, so the space is
+  // whatever is left over — often under 90px. A label there wraps to two lines
+  // and reads as gibberish ("会话状态看板45"), so the foot form is counts only:
+  // the glyph identifies it, `aria-label`/`title` carry the words, and the three
+  // metrics stay on one line because they never shrink.
   return (
     <button
       type="button"
@@ -148,29 +152,22 @@ export function BoardTrigger({
       data-open={open}
       onClick={() => controller.toggle()}
     >
-      <span className="status-board__strip-label">
+      <span className="status-board__strip-glyph" aria-hidden="true">
         <BoardGlyph size={14} />
-        <span className="status-board__strip-text">{label}</span>
       </span>
       <span className="status-board__strip-metrics" aria-hidden="true">
-        {decision > 0 ? (
-          <span className="status-board__metric" data-metric="decision">
-            <span className="status-board__metric-dot" />
-            {decision}
-          </span>
-        ) : null}
-        {executing > 0 ? (
-          <span className="status-board__metric" data-metric="executing">
-            <span className="status-board__metric-dot" />
-            {executing}
-          </span>
-        ) : null}
-        {recent > 0 || total === 0 ? (
-          <span className="status-board__metric" data-metric="recent">
-            <span className="status-board__metric-dot" />
-            {recent}
-          </span>
-        ) : null}
+        <span className="status-board__metric" data-metric="decision">
+          <span className="status-board__metric-dot" />
+          {decision}
+        </span>
+        <span className="status-board__metric" data-metric="executing">
+          <span className="status-board__metric-dot" />
+          {executing}
+        </span>
+        <span className="status-board__metric" data-metric="recent">
+          <span className="status-board__metric-dot" />
+          {recent}
+        </span>
       </span>
     </button>
   )

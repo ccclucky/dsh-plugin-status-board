@@ -34,7 +34,10 @@ const DEFAULTS: ResolvedStatusBoardConfig = {
 
 /** A session row with the fields the adapter reads. */
 function row(id: string, title: string, overrides: Record<string, unknown> = {}) {
-  return { id, displayTitle: title, running: false, updatedAt: NOW, ...overrides }
+  // `awaitingDecision: false` is spelled out, not left undefined: the
+  // classifier reads that projection, and a fixture that omits it does not
+  // describe an idle session — it describes one in an unknown state.
+  return { id, displayTitle: title, running: false, awaitingDecision: false, updatedAt: NOW, ...overrides }
 }
 
 /**
@@ -127,14 +130,17 @@ describe('BoardPanel', () => {
     expect(store.getSnapshot().board.counts.decision).toBe(1)
   })
 
-  it('shows each board count as a readout with its unit', async () => {
+  it('tallies each board on its header, and states only the decision count in words', async () => {
+    // Every header carries a small tally.
     const markup = await render([row('e1', 'One', { running: true }), row('e2', 'Two', { running: true })])
-    // The count is not a bare badge: it reads as "2 running", so the number and
-    // the unit are separate nodes sharing the readout.
-    expect(markup).toMatch(/status-board__readout-n[^>]*>2</)
-    expect(markup).toContain('status-board__readout-u')
-    // Stated once for assistive technology: the toggle's accessible name.
-    expect(markup.match(/aria-label="Expand[^"]*2 sessions"/) ?? markup.match(/aria-label="Collapse[^"]*2 sessions"/)).toBeTruthy()
+    expect(markup).toMatch(/status-board__count[^>]*>2</)
+
+    // No decision sessions here, so no board states its size in words: a big
+    // number on the running board would compete with the rows being scanned.
+    // Strip the inlined stylesheet first — it names these classes too, so a
+    // plain `toContain` would match the CSS text and prove nothing.
+    const body = markup.slice(0, markup.indexOf('<style>')) + markup.slice(markup.indexOf('</style>'))
+    expect(body).not.toContain('status-board__metric-n')
   })
 
   it('exposes a disclosure button with a resolvable aria-controls on each board', async () => {

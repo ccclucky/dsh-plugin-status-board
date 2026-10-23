@@ -141,10 +141,11 @@ export const PANEL_CSS = String.raw`
 
 .status-board__toggle {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
   width: 100%;
-  padding: 4px 6px 5px;
+  min-height: 26px;
+  padding: 2px 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -184,6 +185,8 @@ export const PANEL_CSS = String.raw`
 }
 
 .status-board__name-text {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   font-size: 10.5px;
   font-weight: 700;
@@ -192,18 +195,27 @@ export const PANEL_CSS = String.raw`
   white-space: nowrap;
 }
 
-/* The readout: number at reading size, unit at caption size, baseline-aligned.
-   This is the one place the board spends size on emphasis. */
-.status-board__readout {
-  display: flex;
-  flex: 1 1 auto;
-  gap: 4px;
-  align-items: baseline;
-  justify-content: flex-end;
-  min-width: 0;
+/* Small header count. Muted on purpose: it is a tally, not a call to action. */
+.status-board__count {
+  flex: 0 0 auto;
+  color: var(--sb-accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-.status-board__readout-n {
+/* The decision board's readout: number at reading size, unit at caption size,
+   on one baseline, over a hairline that closes the section. This is the single
+   place the panel spends size on emphasis. */
+.status-board__metric {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0;
+  padding: 1px 6px 4px 15px;
+}
+
+.status-board__metric-n {
   color: var(--sb-accent);
   font-size: 19px;
   font-weight: 700;
@@ -212,12 +224,15 @@ export const PANEL_CSS = String.raw`
   line-height: 1;
 }
 
-.status-board__readout-u {
-  overflow: hidden;
+.status-board__metric-u {
   color: var(--dsw-alias-label-secondary);
   font-size: 10.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.status-board__rule {
+  height: 1px;
+  margin: 0 6px 3px 15px;
+  background: var(--dsw-alias-border-l1);
 }
 
 /* ── Rows ────────────────────────────────────────────────────────────────── */
@@ -319,20 +334,31 @@ button.status-board__row:active {
 
 /* Option A: the entry is an instrument, not an icon. It sits in the sidebar foot
    and shows the three counts, so the numbers are readable without opening the
-   panel. The whole strip is one button. */
+   panel. The whole strip is one button.
+
+   Sizing is deliberately defensive: the foot renders this beside the settings
+   control, so the available width is whatever is left over. Auto width plus
+   min-width 0 and nowrap keeps the strip on ONE line, and the metrics never
+   shrink. (A full-width strip here wrapped to two lines and read as the title
+   smashed against the numbers, which is what the first cut did.) */
 .status-board__strip {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   box-sizing: border-box;
-  width: 100%;
-  min-height: 30px;
-  padding: 4px 7px;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0 7px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
+  white-space: nowrap;
   text-align: left;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
@@ -354,22 +380,16 @@ button.status-board__row:active {
   background: var(--dsw-alias-bg-layer-2);
 }
 
-.status-board__strip-label {
+.status-board__strip-glyph {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  justify-content: center;
   color: var(--dsw-alias-label-secondary);
 }
 
-.status-board__strip-text {
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.status-board__strip[data-open="true"] .status-board__strip-glyph {
+  color: var(--dsw-alias-brand-primary);
 }
 
 .status-board__strip-metrics {
