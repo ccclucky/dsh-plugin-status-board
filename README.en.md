@@ -246,17 +246,24 @@ Before publishing anything, `release.yml` checks:
 | The version carries a pre-release id (`-rc.1` and friends) | Publishes under `--tag next` so `latest` is never polluted |
 | typecheck / build / unit and artefact tests / pack | Any red stops the publish |
 
-It then runs `npm publish --provenance`: the credential is minted by the runner at publish time (OIDC), so **no npm publish token lives in the repository, and none should**. Afterwards it installs the published version into a throwaway directory that shares nothing with the checkout and `import()`s it — the only step that can catch a packaging mistake such as a missing `files` entry or a bad `exports` map.
+It then runs `npm publish --provenance`, authenticated by a repository secret **`NPM_TOKEN`** passed as `NODE_AUTH_TOKEN`. The Sigstore certificate that `--provenance` needs is fetched with the runner's OIDC identity — the `id-token: write` permission. **Both are required and they are not alternatives**: remove `id-token` and publishing still succeeds, it just silently loses the attestation. Afterwards it installs the published version into a throwaway directory that shares nothing with the checkout and `import()`s it — the only step that can catch a packaging mistake such as a missing `files` entry or a bad `exports` map.
+
+> ⚠️ `setup-node` must also set `registry-url`, or `NODE_AUTH_TOKEN` is **silently ignored** and the failure only shows up several steps later as `ENEEDAUTH`.
 
 To prove the whole chain without shipping anything, run **Actions → Release → Run workflow** with the dry-run box ticked (it is the default): every gate and build step runs, publish and the install-back are skipped.
 
-### One-time setup (on the npm side)
+### One-time setup
 
-Token-free publishing needs a trusted publisher registered once, on the package page under **Publishing → Trusted publishers → Add publisher**: GitHub Actions, owner `ccclucky`, repository `dsh-plugin-status-board`, workflow file name `release.yml`, event `release`, environment left empty.
+One repository secret is all it takes (already configured on this repo):
 
-> ⚠️ Those fields are **case-sensitive and must match character for character**, npm **does not validate them when you save** — a mistake only surfaces at the first real publish — and an existing trusted publisher **cannot be edited**, only deleted and re-added. So the file name `.github/workflows/release.yml` is a commitment: do not rename it afterwards.
+```powershell
+# Read the token from the local .npmrc; piped over stdin so it never appears on
+# a command line where another user could see it.
+$tok = (Select-String -Path .npmrc -Pattern '_authToken=(\S+)').Matches[0].Groups[1].Value
+$tok | gh secret set NPM_TOKEN
+```
 
-Once the first CI publish succeeds, revoke the publish token in the local `.npmrc` (it carries `bypass_2fa`, which is broader than it needs to be).
+Consider replacing the current token with an npm **Automation** token (cannot sign in to the website, cannot change account settings): the one in use can bypass 2FA, which is broader than publishing needs.
 
 ---
 

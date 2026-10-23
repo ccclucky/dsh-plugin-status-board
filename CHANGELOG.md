@@ -21,11 +21,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- The npm credential is no longer a long-lived token in `.npmrc`: the runner
-  exchanges an OIDC identity for one at publish time (npm *trusted publishing*),
-  and `--provenance` makes the published bytes attributable to this commit. The
-  local token, which also carried `bypass_2fa`, can be revoked once the first CI
-  publish succeeds.
+- The npm credential moved out of the maintainer's laptop and into a repository
+  secret (`NPM_TOKEN`, passed as `NODE_AUTH_TOKEN`), so releases no longer depend
+  on whoever happened to have a working `.npmrc` that day.
+- `--provenance` is requested on every publish, which needs the runner's
+  `id-token: write` permission to obtain a Sigstore certificate. Publishing is
+  authenticated by the token; provenance is attested by the OIDC identity — the
+  two are complementary, and dropping the permission loses the attestation
+  silently rather than failing the publish.
 
 ## [0.2.1] — 2026-10-23
 

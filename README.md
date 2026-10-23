@@ -246,17 +246,23 @@ dsh-plugin-status-board/
 | 版本号带预发布标识（`-rc.1` 等） | 自动改用 `--tag next`，不污染 `latest` |
 | typecheck / build / 单元与产物测试 / pack | 任一步红即不发布 |
 
-通过后执行 `npm publish --provenance`：凭据由 runner 现场签发（OIDC），**仓库里不需要、也不应存在 npm 发布 token**。发布后还会在一个与本次 checkout 毫无关系的干净目录里 `npm install` 回来并 `import()` 一次——这是唯一能发现「打包清单漏了文件、`exports` 写错」这类问题的步骤。
+通过后执行 `npm publish --provenance`，凭据是仓库 secret **`NPM_TOKEN`**（经 `NODE_AUTH_TOKEN` 传入）。`--provenance` 需要的 Sigstore 证书由 runner 的 OIDC 身份换取，也就是 `id-token: write` 权限——**两者都要，它不是另一套登录方式**：去掉 `id-token` 发布照样成功，只是会静默丢掉溯源。发布后还会在一个与本次 checkout 毫无关系的干净目录里 `npm install` 回来并 `import()` 一次——这是唯一能发现「打包清单漏了文件、`exports` 写错」这类问题的步骤。
+
+> ⚠️ `setup-node` 必须同时配 `registry-url`，否则 `NODE_AUTH_TOKEN` 会被**静默忽略**，错误要到几步之后才以 `ENEEDAUTH` 出现。
 
 想在不发布的前提下验证整条链路，可在 **Actions → Release → Run workflow** 里勾上 dry run（默认勾选）：它会跑完全部关卡与构建，只跳过发布与装回。
 
-### 一次性配置（npm 侧）
+### 一次性配置
 
-免 token 发布需要在 npm 上登记一次可信发布者：包页 **Publishing → Trusted publishers → Add publisher**，选 GitHub Actions，填 owner `ccclucky`、repository `dsh-plugin-status-board`、workflow 文件名 `release.yml`、event `release`，environment 留空。
+只需要一个仓库 secret（本仓库已配好）：
 
-> ⚠️ 这些字段**大小写敏感、必须逐字一致**，且 npm 在保存时**不做校验**，错误只在真正发布时才暴露；而已登记的可信发布者**不可修改**，要改只能删掉重建。所以 `.github/workflows/release.yml` 这个文件名一经采用就不要再改。
+```bash
+# 从本机 .npmrc 取 token；经 stdin 传入，避免出现在命令行里被同机用户看到
+$tok = (Select-String -Path .npmrc -Pattern '_authToken=(\S+)').Matches[0].Groups[1].Value
+$tok | gh secret set NPM_TOKEN
+```
 
-登记完成、首次 CI 发布成功后，即可吊销本机 `.npmrc` 里那个发布 token（它带 `bypass_2fa`，权限偏大）。
+建议在 npm 上另建一个 **Automation** 类型的 token（不能登录网页、不能改账户设置）替换现在这个——当前 token 可绕过 2FA，权限比发布所需的更宽。
 
 ---
 

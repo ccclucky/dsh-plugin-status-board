@@ -2,18 +2,20 @@
 # decision is the click on "Publish release"; the tag and the draft release are
 # a staging area that can still be edited or deleted).
 #
-# WHY THIS FILE IS NAMED release.yml
-# ───────────────────────────────────
-# npm's trusted-publisher record stores the workflow file name, and npm refuses
-# to change an existing record ("Existing trusted publisher connections cannot
-# be changed"), so renaming this file later would need the publisher deleted and
-# re-added. Decide the name once; keep it.
+# HOW IT AUTHENTICATES
+# ────────────────────
+# `NPM_TOKEN` (a repository secret) is the npm credential, passed as
+# NODE_AUTH_TOKEN, which is the shape npm's own provenance example uses.
+# `id-token: write` is still required and is NOT an alternative credential: it
+# lets the runner fetch a Sigstore certificate, which is what makes
+# `--provenance` work. Drop it and publishing still succeeds, but the published
+# version silently loses its provenance attestation.
 #
-# WHY THE CHECKS ARE DUPLICATED FROM ci.yml INSTEAD OF REUSING IT
-# ───────────────────────────────────────────────────────────────
-# npm documents that with `workflow_call`, trusted-publisher validation looks at
-# the *calling* workflow's name rather than the file holding `npm publish`, which
-# silently breaks authentication. Inlining is repetition with a reason.
+# WHY THE CHECKS ARE INLINED RATHER THAN REUSING ci.yml
+# ─────────────────────────────────────────────────────
+# So this job reads end to end as one release decision: the gates that justify
+# publishing sit next to the publish they guard. ci.yml stays the gate for every
+# push and pull request; this file adds the release-only gates on top.
 name: Release
 
 on:
@@ -30,9 +32,9 @@ on:
 
 permissions:
   contents: read
-  # Minted by the runner and exchanged for an npm token at publish time. This is
-  # what removes the need for an NPM_TOKEN secret (and for the long-lived
-  # publish token this repo used before).
+  # Not a credential: lets the runner obtain a Sigstore certificate so
+  # `npm publish --provenance` can attest where the bytes came from. See the
+  # header, and note this is required even though npm auth here is a plain token.
   id-token: write
 
 jobs:
@@ -48,9 +50,15 @@ jobs:
       # Node 24 = the build/toolchain floor (see ci.yml). The supported runtime
       # is a separate question and is still Node >=20, asserted by the emitted
       # `target: node20` for the Host half.
+      #
+      # `registry-url` is load-bearing, not cosmetic: setup-node only writes an
+      # `_authToken` entry when it is set, so without it NODE_AUTH_TOKEN is
+      # silently ignored and `npm publish` fails with ENEEDAUTH far from the
+      # cause.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: 'https://registry.npmjs.org'
           cache: pnpm
 
       - name: Install
@@ -76,6 +84,9 @@ jobs:
           GITHUB_REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          # Passed as a length probe only: the token itself stays out of this
+          # step, and an empty string is how a missing secret arrives.
+          HAS_TOKEN: ${{ secrets.NPM_TOKEN != '' && 'yes' || '' }}
         run: |
           set -euo pipefail
 
@@ -99,6 +110,14 @@ jobs:
             # No release tag on a manual run, so the equality gate cannot be
             # asserted here. Say so instead of letting a green check imply it was.
             echo "::warning::manual run: the tag==manifest gate is NOT exercised here"
+          fi
+
+          # Fail here with a sentence that names the fix, rather than letting
+          # `npm publish` report ENEEDAUTH two steps later next to a wall of
+          # npm's own stack.
+          if [ "$DRY_RUN" != true ] && [ -z "$HAS_TOKEN" ]; then
+            echo "::error::the NPM_TOKEN repository secret is not set (Settings → Secrets and variables → Actions)"
+            exit 1
           fi
 
           # npm refuses to republish a version, and a failed-but-partial publish
@@ -133,6 +152,11 @@ jobs:
         # leave the decision to GitHub's type coercion. A manual run publishes
         # only when the dry-run flag is explicitly off.
         if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
+        # setup-node turns NODE_AUTH_TOKEN into an `_authToken` line for the
+        # configured registry, which is the mechanism npm's own documented
+        # provenance workflow uses.
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public --tag "${{ steps.gate.outputs.dist_tag }}"
 
       # Proves the published bytes work for a real consumer, in a directory that
