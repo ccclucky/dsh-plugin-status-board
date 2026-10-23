@@ -228,6 +228,8 @@ Nothing. The styles are a `<style>` element inside the panel component, so unmou
 
 ## Release process (maintainers)
 
+> When an agent performs the release, read [`AGENTS.md`](AGENTS.md) in the repository root first: it carries the full command sequence, what each gate failure means, and the build invariants that make CI red while a local build stays green.
+
 Releases are published by GitHub Actions, never by a local `npm publish`. The one gate is the human act of publishing a Release:
 
 1. Bump the version and update `CHANGELOG.md`; commit, push to `main`, wait for CI.

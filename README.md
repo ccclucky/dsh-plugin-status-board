@@ -228,6 +228,8 @@ dsh-plugin-status-board/
 
 ## 发布流程（维护者）
 
+> 由 agent 执行发布时，先读仓库根的 [`AGENTS.md`](AGENTS.md)：那里有完整命令序列、各关卡的失败含义，以及几条「改了就会让 CI 红但本机绿」的构建不变量。
+
 发布由 GitHub Actions 完成，**不在本机 `npm publish`**。唯一的闸门是「发布一个 Release」这个人工动作：
 
 1. 升版本号并同步 `CHANGELOG.md`，提交、推 `main`、等 CI 绿。
