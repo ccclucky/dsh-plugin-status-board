@@ -140,7 +140,7 @@ describe('BoardPanel', () => {
     // Strip the inlined stylesheet first — it names these classes too, so a
     // plain `toContain` would match the CSS text and prove nothing.
     const body = markup.slice(0, markup.indexOf('<style>')) + markup.slice(markup.indexOf('</style>'))
-    expect(body).not.toContain('status-board__metric-n')
+    expect(body).not.toContain('status-board__readout-n')
   })
 
   it('exposes a disclosure button with a resolvable aria-controls on each board', async () => {

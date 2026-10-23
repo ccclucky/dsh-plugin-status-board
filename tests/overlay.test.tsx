@@ -116,17 +116,37 @@ describe('createOverlayController', () => {
 })
 
 describe('BoardOverlay', () => {
-  it('renders the nav-row readout badge even while closed', () => {
+  it('renders the nav-row readout badge even while closed', async () => {
     // The badge is the entry's whole point: the framework row can only carry
     // icon + plain text, so the coloured counts live in the overlay layer and
     // must be present without the panel being open.
     const store = makeStore([])
     const row = document.createElement('button')
     row.dataset.statusBoardEntry = 'true'
+    // A laid-out row: measurement rejects a zero box, so the fixture has to
+    // report a real one.
+    row.getBoundingClientRect = () =>
+      ({ right: 240, top: 300, height: 32, width: 240, left: 0, bottom: 332, x: 0, y: 300, toJSON: () => ({}) }) as DOMRect
     document.body.append(row)
-    const container = mount(
-      createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
-    )
+
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    act(() => {
+      root.render(
+        createElement(BoardOverlay, {
+          controller: createOverlayController(),
+          store,
+          resolveNavigation: () => undefined,
+        }),
+      )
+    })
+    mounted.push({ root, container })
+    // The measurement retries across frames; let one land.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 40))
+    })
+
     expect(container.querySelector('.status-board__row-badge')).not.toBeNull()
     expect(container.querySelector('[role="dialog"]')).toBeNull()
     expect(container.querySelectorAll('.status-board__metric')).toHaveLength(3)
@@ -141,12 +161,16 @@ describe('BoardOverlay', () => {
     )
     expect(container.querySelector('.status-board__row-badge')).toBeNull()
   })
-  it('renders nothing until opened', () => {
+  it('draws no panel until opened', () => {
     const store = makeStore([])
     const container = mount(
       createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
     )
-    expect(container.innerHTML).toBe('')
+    // The stylesheet is always present now (the closed readout badge needs it),
+    // so "closed" means no dialog — not an empty container.
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(container.querySelector('.status-board__overlay')).toBeNull()
+    expect(container.querySelector('style')).not.toBeNull()
   })
 
   it('opens from the trigger as a labelled dialog and closes again', () => {

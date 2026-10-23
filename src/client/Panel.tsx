@@ -248,9 +248,9 @@ function Bucket({
             rows they are trying to read. */}
         {id === 'decision' && count > 0 ? (
           <>
-            <p className="status-board__metric" aria-hidden="true">
-              <span className="status-board__metric-n">{count}</span>
-              <span className="status-board__metric-u">{unit}</span>
+            <p className="status-board__readout" aria-hidden="true">
+              <span className="status-board__readout-n">{count}</span>
+              <span className="status-board__readout-u">{unit}</span>
             </p>
             <div className="status-board__rule" aria-hidden="true" />
           </>

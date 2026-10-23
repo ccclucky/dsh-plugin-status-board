@@ -206,8 +206,9 @@ export const PANEL_CSS = String.raw`
 
 /* The decision board's readout: number at reading size, unit at caption size,
    on one baseline, over a hairline that closes the section. This is the single
-   place the panel spends size on emphasis. */
-.status-board__metric {
+   place the panel spends size on emphasis. Named apart from the nav-row count
+   pill below so the two never inherit each other's box model. */
+.status-board__readout {
   display: flex;
   gap: 6px;
   align-items: baseline;
@@ -215,7 +216,7 @@ export const PANEL_CSS = String.raw`
   padding: 1px 6px 4px 15px;
 }
 
-.status-board__metric-n {
+.status-board__readout-n {
   color: var(--sb-accent);
   font-size: 24px;
   font-weight: 700;
@@ -224,7 +225,7 @@ export const PANEL_CSS = String.raw`
   line-height: 1;
 }
 
-.status-board__metric-u {
+.status-board__readout-u {
   color: var(--dsw-alias-label-secondary);
   font-size: 11.5px;
 }
@@ -363,88 +364,23 @@ button.status-board__row:active {
   pointer-events: none;
 }
 
-/* ── Sidebar-foot readout ────────────────────────────────────────────────── */
-
-/* Option A: the entry is an instrument, not an icon. It sits in the sidebar foot
-   and shows the three counts, so the numbers are readable without opening the
-   panel. The whole strip is one button.
-
-   Sizing is deliberately defensive: the foot renders this beside the settings
-   control, so the available width is whatever is left over. Auto width plus
-   min-width 0 and nowrap keeps the strip on ONE line, and the metrics never
-   shrink. (A full-width strip here wrapped to two lines and read as the title
-   smashed against the numbers, which is what the first cut did.) */
-.status-board__strip {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 7px;
-  box-sizing: border-box;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
-  height: 28px;
-  margin: 0;
-  padding: 0 7px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  white-space: nowrap;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-
-.status-board__strip:hover {
-  background: var(--dsw-alias-bg-layer-2);
-  border-color: var(--dsw-alias-border-l2);
-}
-
-.status-board__strip:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: -2px;
-}
-
-/* Open state reads as "this is the panel's trigger", not as a second hover. */
-.status-board__strip[data-open="true"] {
-  border-color: var(--dsw-alias-brand-primary);
-  background: var(--dsw-alias-bg-layer-2);
-}
-
-.status-board__strip-glyph {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.status-board__strip[data-open="true"] .status-board__strip-glyph {
-  color: var(--dsw-alias-brand-primary);
-}
-
-.status-board__strip-metrics {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 7px;
-  align-items: center;
-}
-
+/* The three counts, pinned to the right of the nav row. Colour lives on the dot
+   alone: the number keeps the row's own text colour, so the group reads as one
+   instrument instead of three competing warnings. A zero recedes to idle grey —
+   an empty board has nothing to ask for. */
 .status-board__metric {
   display: inline-flex;
-  gap: 3px;
+  gap: 4px;
   align-items: center;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .status-board__metric-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--dsw-alias-state-idle-primary);
 }
@@ -453,60 +389,20 @@ button.status-board__row:active {
   background: var(--dsw-alias-state-warn-primary);
 }
 
-.status-board__metric[data-metric="decision"] {
-  color: var(--dsw-alias-state-warn-primary);
-}
-
 .status-board__metric[data-metric="executing"] .status-board__metric-dot {
   background: var(--dsw-alias-brand-primary);
 }
 
-/* Compact form, used only when the sidebar is collapsed to its rail. */
-.status-board__trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
+.status-board__metric[data-metric="recent"] .status-board__metric-dot {
+  background: var(--dsw-alias-state-idle-primary);
+}
+
+.status-board__metric[data-empty="true"] {
   color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  transition: background 100ms ease, color 100ms ease;
 }
 
-.status-board__trigger:hover {
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-primary);
-}
-
-.status-board__trigger:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: -2px;
-}
-
-.status-board__trigger[data-open="true"] {
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-brand-primary);
-}
-
-.status-board__trigger-count {
-  min-width: 15px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--dsw-alias-state-warn-primary);
-  color: var(--dsw-alias-bg-layer-1);
-  font-size: 10px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 15px;
-  text-align: center;
+.status-board__metric[data-empty="true"] .status-board__metric-dot {
+  background: var(--dsw-alias-state-idle-primary);
 }
 
 /* ── Floating board ──────────────────────────────────────────────────────── */

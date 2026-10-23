@@ -37,6 +37,7 @@ import {
 import { createTranslate } from '../shared/i18n.ts'
 import type { BoardStore } from './store.ts'
 import { BoardGlyph, BoardPanel } from './Panel.tsx'
+import { PANEL_CSS } from './styles.ts'
 
 /**
  * Open/closed state for the floating board.
@@ -211,18 +212,49 @@ export function BoardOverlay({
   // against the row that owns them instead of at a fixed spot in the frame.
   const [rowRect, setRowRect] = useState<{ right: number; top: number; height: number } | null>(null)
   useEffect(() => {
-    const measure = (): void => {
+    let attempts = 0
+
+    const measure = (): boolean => {
       const row = document.querySelector<HTMLElement>('[data-status-board-entry]')
-      if (row === null) {
-        setRowRect(null)
-        return
-      }
+      if (row === null) return false
       const rect = row.getBoundingClientRect()
+      // A row that exists but has not been laid out yet reports a zero box;
+      // anchoring to it would put the badge at the window origin for one frame.
+      if (rect.width === 0 || rect.height === 0) return false
       setRowRect({ right: rect.right, top: rect.top, height: rect.height })
+      return true
     }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+
+    // The row is marked by `BoardNavEntry`, whose effect can run after this one:
+    // the two are sibling slot registrations with no shared parent. So retry
+    // across frames instead of measuring once and silently giving up — that is
+    // exactly the bug that made the badge never appear in the real app.
+    // `requestAnimationFrame` is absent in a bare DOM, so fall back to a
+    // microtask-delayed retry rather than throwing.
+    const schedule = (callback: () => void): number | ReturnType<typeof setTimeout> => {
+      if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)
+      return setTimeout(callback, 16)
+    }
+    const cancel = (handle: number | ReturnType<typeof setTimeout>): void => {
+      if (typeof handle === 'number' && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle)
+      else clearTimeout(handle as ReturnType<typeof setTimeout>)
+    }
+    let handle: number | ReturnType<typeof setTimeout> = 0
+    const tick = (): void => {
+      if (measure() || attempts >= 60) return
+      attempts += 1
+      handle = schedule(tick)
+    }
+    tick()
+
+    const onResize = (): void => {
+      measure()
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      cancel(handle)
+      window.removeEventListener('resize', onResize)
+    }
     // Re-measured when the board changes too: a count going from 3 to 12 changes
     // the badge width, and the label can reflow the row above it.
   }, [open, state.board])
@@ -303,22 +335,35 @@ export function BoardOverlay({
         aria-hidden="true"
         style={{ top: rowRect.top + rowRect.height / 2, right: `calc(100vw - ${rowRect.right}px + 10px)` }}
       >
-        <span className="status-board__metric" data-metric="decision">
+        <span className="status-board__metric" data-metric="decision" data-empty={counts.decision === 0}>
           <span className="status-board__metric-dot" />
           {counts.decision}
         </span>
-        <span className="status-board__metric" data-metric="executing">
+        <span className="status-board__metric" data-metric="executing" data-empty={counts.executing === 0}>
           <span className="status-board__metric-dot" />
           {counts.executing}
         </span>
-        <span className="status-board__metric" data-metric="recent">
+        <span className="status-board__metric" data-metric="recent" data-empty={counts.recent === 0}>
           <span className="status-board__metric-dot" />
           {counts.recent}
         </span>
       </div>
     )
 
-  if (!open) return badge
+  // The badge is styled by the board's stylesheet, so that stylesheet has to be
+  // in the document whenever the badge is — not only while the panel is open.
+  // Rendering it only inside `BoardPanel` left a closed board's readout unstyled
+  // and therefore invisible, which is how the first cut shipped.
+  const styles = <style>{PANEL_CSS}</style>
+
+  if (!open) {
+    return (
+      <>
+        {styles}
+        {badge}
+      </>
+    )
+  }
 
   const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
 
