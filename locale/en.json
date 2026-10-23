@@ -39,7 +39,8 @@
   "action": {
     "open": "Open session",
     "refresh": "Refresh board",
-    "filter": "Filter sessions"
+    "filter": "Filter sessions",
+    "close": "Hide board"
   },
   "detail": {
     "label": "Board:"

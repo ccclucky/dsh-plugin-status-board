@@ -250,4 +250,141 @@ button.status-board__row:hover {
     transition: none;
   }
 }
+
+/* ── Floating board (option C) ─────────────────────────────────────────────
+   The trigger sits at the sidebar foot beside Settings; the board floats in the
+   frame-wide overlay layer. Both read as Harness chrome, not as an app window. */
+
+.status-board__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.status-board__trigger:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__trigger[data-open="true"] {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.status-board__trigger-count {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-bg-layer-1);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.status-board__overlay-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  /* Anchored to the sidebar's width, so the board opens beside the trigger
+     rather than floating detached in the middle of the window. */
+  padding: 44px 0 44px 12px;
+}
+
+.status-board__overlay {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  /* Opaque on purpose: a translucent board over a conversation is unreadable.
+     The shadow is derived from a theme token rather than a hardcoded black, so
+     it inverts correctly in dark mode and keeps the token-only colour rule. */
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 24%, transparent);
+}
+
+.status-board__overlay:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__overlay-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.status-board__overlay-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--dsw-alias-label-secondary);
+  text-transform: uppercase;
+}
+
+.status-board__overlay-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.status-board__overlay-close:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__overlay-close:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
+
+.status-board__overlay-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The board inside the overlay is a panel, not a sidebar column: it already
+   sits on an opaque surface, so it drops the sidebar fill it would inherit. */
+.status-board__overlay-body .status-board {
+  height: auto;
+  background: transparent;
+}
 `

@@ -52,6 +52,8 @@ export interface LocaleFile {
     readonly refresh: string
     /** Placeholder and accessible label of the sidebar filter box. */
     readonly filter: string
+    /** Accessible label of the floating board's close control. */
+    readonly close: string
   }
   readonly detail: {
     /** Label of the hover-card section naming a session's board. */

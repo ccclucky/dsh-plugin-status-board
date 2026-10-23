@@ -39,7 +39,8 @@
   "action": {
     "open": "打开会话",
     "refresh": "刷新看板",
-    "filter": "筛选会话"
+    "filter": "筛选会话",
+    "close": "收起看板"
   },
   "detail": {
     "label": "看板："
