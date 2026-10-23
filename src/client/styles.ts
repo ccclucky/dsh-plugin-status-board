@@ -510,14 +510,15 @@ button.status-board__row:active {
   animation: status-board-status-breathe-soft 2.6s ease-in-out infinite;
 }
 
-/* Executing: a spinning arc; the directory adds a solid core, the session does
-   not. */
+/* Executing: a short sweep on appearance, then a static arc. A perpetual
+   spinner on every running row is noise; the colour and the gap still read as
+   work in flight. The directory adds a solid core, the session does not. */
 .status-board-status[data-bucket="executing"][data-variant="folder"]::before {
   width: 12px;
   height: 12px;
   border: 2px solid var(--sb-status-soft);
   border-top-color: var(--sb-status);
-  animation: status-board-status-spin 1.4s linear infinite;
+  animation: status-board-status-spin 1.4s linear 2;
 }
 
 .status-board-status[data-bucket="executing"][data-variant="folder"]::after {
@@ -531,7 +532,7 @@ button.status-board__row:active {
   height: 9px;
   border: 1.5px solid var(--sb-status-soft);
   border-top-color: var(--sb-status);
-  animation: status-board-status-spin 1.4s linear infinite;
+  animation: status-board-status-spin 1.4s linear 2;
 }
 
 /* Recent: a static dot with a faint ring (directory), a static hollow ring

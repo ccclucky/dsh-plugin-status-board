@@ -41,8 +41,8 @@ an inline navigation tree, and a compact floating button opens the full board.
   entry is a labelled pill at the bottom-right instead of a bare icon square.
 - **Status marks carry state, not just colour.** A decision is a solid amber
   dot inside a slow breathing halo (the session variant is a hollow breathing
-  ring); work in flight is a spinning blue arc (the directory variant keeps a
-  solid core); history is a static grey dot/ring. Directories are the filled,
+  ring); work in flight sweeps twice and then settles into a static blue arc
+  (the directory variant keeps a solid core); history is a static grey dot/ring. Directories are the filled,
   stronger variant; sessions are the hollow, softer one. Motion is disabled
   under `prefers-reduced-motion`; the text and counts remain the primary
   signal.
