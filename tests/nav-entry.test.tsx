@@ -1,174 +1,206 @@
 /**
- * The sidebar-nav entry (shape A).
+ * Entry ①: the sidebar row expands a real, inline navigation tree.
  *
- * The risky part of this shape is not the visuals: it is that the nav row's
- * button belongs to the framework and normally navigates. These tests pin the
- * interception, because a row that selects a dead main column would be worse
- * than no row at all.
+ * The risky part is not the visuals: the row's button belongs to the framework
+ * and normally navigates. These tests pin three things — the row toggles the
+ * tree instead of navigating, the tree is portaled into the sidebar's nav and
+ * removed on unmount, and a session row keeps the Workspace browser's contract
+ * (click = open session, no answer controls in the tree).
  *
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { BoardNavEntry, describeCountsShort, createOverlayController } from '../src/client/overlay.tsx'
+import { BoardNavEntry, createOverlayController, describeCounts } from '../src/client/overlay.tsx'
 import { buildBoard } from '../src/shared/board.ts'
 import { CONFIG_DEFAULTS } from '../src/shared/config.ts'
+import { createTranslate } from '../src/shared/i18n.ts'
 import type { BoardState, BoardStore } from '../src/client/store.ts'
 import type { SessionSignal } from '../src/shared/types.ts'
 
 const NOW = Date.UTC(2026, 9, 23, 11, 30, 0)
-
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+/** One classifier input, with the fields the tree cares about. */
 function signal(id: string, extra: Partial<SessionSignal> = {}): SessionSignal {
   return { id, title: id, running: false, awaitingDecision: false, lastActivityAt: NOW - 60_000, ...extra }
 }
 
-function makeStore(signals: readonly SessionSignal[]): BoardStore {
-  const state: BoardState = {
+/** A store double over a fixed board; folder clicks only need a callable toggle. */
+function makeStore(signals: readonly SessionSignal[]): BoardStore & { toggled: string[] } {
+  const toggled: string[] = []
+  const collapse = { decision: false, executing: false, recent: true }
+  const state = {
     status: 'ready',
     board: buildBoard(signals, { ...CONFIG_DEFAULTS, recentWindowHours: 24, maxRecent: 20 }, NOW),
     config: CONFIG_DEFAULTS,
-    collapse: {},
+    collapse,
     locale: 'en',
   } as unknown as BoardState
   return {
+    toggled,
     subscribe: () => () => {},
     getSnapshot: () => state,
-    toggle: () => {},
-    setLocale: () => {},
+    toggle: (id: string) => {
+      toggled.push(id)
+    },
     dispose: () => {},
-  } as unknown as BoardStore
+  } as unknown as BoardStore & { toggled: string[] }
 }
 
 const mounted: Array<{ root: Root; container: HTMLElement }> = []
-
 afterEach(() => {
   for (const entry of mounted.splice(0)) {
     act(() => entry.root.unmount())
     entry.container.remove()
   }
+  document.querySelectorAll('[data-status-board-tree]').forEach(node => node.remove())
 })
 
 /**
- * Mount the entry the way the shell does: inside a nav-row button that has its
- * own click handler (the framework's navigation).
- *
- * `rerender` allows dropping just the entry while the row stays mounted, which
- * is the only way to tell whether the plugin removed its capture listener rather
- * than the whole tree disappearing underneath it.
+ * Mount the entry the way the shell does: inside a nav, inside the row button
+ * that owns the framework navigation handler.
  */
-function mountInRow(store: BoardStore, controller = createOverlayController()) {
+function mountInNav(store: BoardStore, options: { size?: number; onOpen?: (id: string) => void; withNav?: boolean } = {}) {
   const container = document.createElement('div')
   document.body.append(container)
   const navigate = vi.fn()
-  const root = createRoot(container)
+  const tree = createOverlayController()
+  const rowButton = document.createElement('button')
+  rowButton.type = 'button'
+  rowButton.addEventListener('click', navigate)
+  const nav = document.createElement('nav')
+  nav.setAttribute('aria-label', 'panels')
+  nav.append(rowButton)
+  if (options.withNav === false) container.append(rowButton)
+  else container.append(nav)
 
-  const draw = (withEntry: boolean): void => {
-    act(() => {
-      root.render(
-        createElement(
-          'button',
-          { type: 'button', onClick: navigate },
-          withEntry ? createElement(BoardNavEntry, { controller, store, size: 16 }) : null,
-          createElement('span', null, 'Session Status Board'),
-        ),
-      )
-    })
-  }
-
-  draw(true)
-  mounted.push({ root, container })
-  const row = container.querySelector('button') as HTMLButtonElement
-  return {
-    container,
-    row,
-    navigate,
-    controller,
-    /** Drop the entry, keeping the row itself in place. */
-    dropEntry: () => draw(false),
-  }
+  const entryRoot = createRoot(rowButton)
+  act(() => {
+    entryRoot.render(
+      createElement(BoardNavEntry, {
+        tree,
+        store,
+        size: options.size ?? 16,
+        resolveNavigation: () => options.onOpen,
+      }),
+    )
+  })
+  mounted.push({ root: entryRoot, container })
+  return { container, row: rowButton, nav, tree, navigate, store, root: entryRoot }
 }
 
-describe('BoardNavEntry', () => {
-  it('renders the glyph only, leaving the row chrome to the framework', () => {
-    const { container } = mountInRow(makeStore([]))
-    expect(container.querySelector('.status-board__nav-glyph')).not.toBeNull()
-    // No button of its own: a nested button is invalid HTML and would swallow
-    // the row's own semantics.
-    expect(container.querySelectorAll('button')).toHaveLength(1)
+describe('BoardNavEntry (entry ①)', () => {
+  it('renders the glyph and a chevron inside the framework row', () => {
+    const { row } = mountInNav(makeStore([]))
+    expect(row.querySelector('.status-board__nav-glyph')).not.toBeNull()
+    expect(row.querySelector('.status-board__nav-chevron')).not.toBeNull()
+    // No nested button: the row owns the semantics.
+    expect(row.querySelectorAll('button')).toHaveLength(0)
   })
 
-  it('opens the board instead of navigating when the row is clicked', () => {
-    const store = makeStore([signal('a', { awaitingDecision: true })])
-    const { row, navigate, controller } = mountInRow(store)
-    expect(controller.getSnapshot()).toBe(false)
-
+  it('toggles the tree instead of navigating when the row is clicked', () => {
+    const store = makeStore([signal('d', { awaitingDecision: true })])
+    const { row, navigate, tree } = mountInNav(store)
+    expect(tree.getSnapshot()).toBe(false)
     act(() => {
       row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-
-    // The whole point of this shape: the row must not navigate away.
     expect(navigate).not.toHaveBeenCalled()
-    expect(controller.getSnapshot()).toBe(true)
-  })
-
-  it('toggles back closed on a second click', () => {
-    const { row, controller } = mountInRow(makeStore([]))
+    expect(tree.getSnapshot()).toBe(true)
+    expect(row.getAttribute('aria-expanded')).toBe('true')
     act(() => {
       row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    act(() => {
-      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    expect(controller.getSnapshot()).toBe(false)
+    expect(tree.getSnapshot()).toBe(false)
   })
 
-  it('states the counts on the row for assistive technology', () => {
+  it('portals a three-folder tree into the sidebar nav after the row', () => {
     const store = makeStore([
       signal('d', { awaitingDecision: true }),
       signal('e', { running: true }),
       signal('r', {}),
     ])
-    const { row } = mountInRow(store)
-    // The row is icon + text only, so the numbers are part of its description.
-    expect(row.getAttribute('aria-label')).toContain('Needs my decision 1')
-    expect(row.getAttribute('aria-label')).toContain('Running 1')
-    expect(row.getAttribute('aria-controls')).toBeTruthy()
-    expect(row.getAttribute('aria-expanded')).toBe('false')
-  })
-
-  it('marks the row so the panel does not treat it as an outside click', () => {
-    const { row } = mountInRow(makeStore([]))
-    expect(row.dataset.statusBoardEntry).toBe('true')
-  })
-
-  it('stops intercepting once the entry is gone', () => {
-    const { row, navigate, dropEntry } = mountInRow(makeStore([]))
-    dropEntry()
+    const { row, nav, tree } = mountInNav(store, { onOpen: () => {} })
     act(() => {
       row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    // The framework's own handler works again: the plugin must not leave a
-    // permanent capture listener on someone else's button.
+    const portal = nav.querySelector<HTMLElement>('[data-status-board-tree]')
+    expect(portal).not.toBeNull()
+    expect(portal?.hidden).toBe(false)
+    expect(portal?.querySelectorAll('.status-board-tree__toggle')).toHaveLength(3)
+    // The tree is navigation only: no answer/approval controls.
+    expect(portal?.querySelector('.status-board__answer-toggle')).toBeNull()
+    expect(portal?.textContent).toContain('Needs my decision')
+    expect(tree.getSnapshot()).toBe(true)
+  })
+
+  it('opens a session from a row and keeps the tree open', () => {
+    const onOpen = vi.fn()
+    const { row, nav } = mountInNav(makeStore([signal('r', { title: 'Recent work' })]), { onOpen })
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    const sessionButton = nav.querySelector<HTMLButtonElement>('.status-board-tree__row')
+    expect(sessionButton).not.toBeNull()
+    expect(sessionButton?.getAttribute('aria-label')).toContain('Recent work')
+    act(() => {
+      sessionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onOpen).toHaveBeenCalledWith('r')
+  })
+
+  it('keeps the tree out of the 56px rail', () => {
+    const { row, tree, navigate } = mountInNav(makeStore([]), { size: 18 })
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // The row still must not navigate into a dead main column; it simply has no
+    // tree to show in the rail.
+    expect(navigate).not.toHaveBeenCalled()
+    expect(tree.getSnapshot()).toBe(false)
+    expect(document.querySelector('[data-status-board-tree]')).toBeNull()
+    expect(row.querySelector('.status-board__nav-chevron')).toBeNull()
+  })
+
+  it('removes the portal and the capture listener on unmount', () => {
+    const store = makeStore([])
+    const { row, navigate, root, container } = mountInNav(store)
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(document.querySelector('[data-status-board-tree]')).not.toBeNull()
+    act(() => root.unmount())
+    expect(document.querySelector('[data-status-board-tree]')).toBeNull()
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    // The framework's own handler works again.
     expect(navigate).toHaveBeenCalledTimes(1)
+    container.remove()
+  })
+
+  it('falls back to an anchored panel when the shell exposes no nav', () => {
+    const store = makeStore([])
+    const { row, tree } = mountInNav(store, { withNav: false })
+    // A laid-out row is required for the fallback's fixed rect.
+    row.getBoundingClientRect = () =>
+      ({ left: 10, right: 210, top: 100, bottom: 132, width: 200, height: 32, x: 10, y: 100, toJSON: () => ({}) }) as DOMRect
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(tree.getSnapshot()).toBe(true)
+    // The fallback is portaled to body, so it is not nested inside the row button.
+    expect(document.querySelector('.status-board__tree-fallback')).not.toBeNull()
   })
 })
 
-describe('describeCountsShort', () => {
+describe('describeCounts', () => {
   it('reports the three counts in board order', () => {
-    const store = makeStore([
-      signal('d', { awaitingDecision: true }),
-      signal('e1', { running: true }),
-      signal('e2', { running: true }),
-      signal('r', {}),
-    ])
-    expect(describeCountsShort(undefined as never, store.getSnapshot())).toBe('1 · 2 · 1')
-  })
-
-  it('reports zeros rather than omitting a board', () => {
-    const store = makeStore([])
-    expect(describeCountsShort(undefined as never, store.getSnapshot())).toBe('0 · 0 · 0')
+    const translate = createTranslate('en')
+    expect(describeCounts(translate, { decision: 1, executing: 2, recent: 3 })).toContain('Needs my decision 1')
+    expect(describeCounts(translate, { decision: 1, executing: 2, recent: 3 })).toContain('Running 2')
+    expect(describeCounts(translate, { decision: 1, executing: 2, recent: 3 })).toContain('Recent records 3')
   })
 })

@@ -1,44 +1,45 @@
 /**
- * The floating board (shape C).
+ * Entry ②: the floating button and its board popover.
  *
- * These cover the behaviours a user can actually hit — toggling, Escape, an
- * outside press, and focus movement — because a popover that opens but cannot be
- * dismissed is worse than no popover.
+ * These cover the behaviours a user can hit — toggling, Escape, an outside
+ * press, focus movement, and the decision badge — because a popover that opens
+ * but cannot be dismissed is worse than no popover.
  *
  * @vitest-environment jsdom
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { BoardNavEntry, BoardOverlay, createOverlayController } from '../src/client/overlay.tsx'
+import { BoardOverlay, createOverlayController } from '../src/client/overlay.tsx'
 import { buildBoard } from '../src/shared/board.ts'
 import { CONFIG_DEFAULTS } from '../src/shared/config.ts'
 import type { BoardState, BoardStore } from '../src/client/store.ts'
 import type { SessionSignal } from '../src/shared/types.ts'
 
 const NOW = Date.UTC(2026, 7, 17, 12, 0, 0)
-
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+function signal(id: string, extra: Partial<SessionSignal> = {}): SessionSignal {
+  return { id, title: id, running: false, awaitingDecision: false, lastActivityAt: NOW, ...extra }
+}
 
 function makeStore(signals: readonly SessionSignal[]): BoardStore {
   const state: BoardState = {
     status: 'ready',
     board: buildBoard(signals, { ...CONFIG_DEFAULTS, recentWindowHours: 24, maxRecent: 20 }, NOW),
     config: CONFIG_DEFAULTS,
-    collapse: {},
+    collapse: { decision: false, executing: false, recent: false },
     locale: 'en',
   } as unknown as BoardState
   return {
     subscribe: () => () => {},
     getSnapshot: () => state,
     toggle: () => {},
-    setLocale: () => {},
     dispose: () => {},
   } as unknown as BoardStore
 }
 
 const mounted: Array<{ root: Root; container: HTMLElement }> = []
-
 afterEach(() => {
   for (const entry of mounted.splice(0)) {
     act(() => entry.root.unmount())
@@ -46,43 +47,21 @@ afterEach(() => {
   }
 })
 
-function mount(element: ReturnType<typeof createElement>): HTMLElement {
+function mount(store: BoardStore, controller = createOverlayController()) {
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
-  act(() => root.render(element))
-  mounted.push({ root, container })
-  return container
-}
-
-/**
- * Render the overlay with a nav-row stand-in, as the two slot registrations do
- * in the real shell: `BoardNavEntry` draws the row and opens the board, and
- * `BoardOverlay` renders the panel.
- */
-function mountPair(store: BoardStore, controller = createOverlayController()) {
-  const container = document.createElement('div')
-  document.body.append(container)
-  const root = createRoot(container)
-  const render = (): void => {
-    act(() =>
-      root.render(
-        createElement(
-          'div',
-          null,
-          createElement(
-            'button',
-            { type: 'button', 'data-status-board-entry': 'true' },
-            createElement(BoardNavEntry, { controller, store, size: 16 }),
-          ),
-          createElement(BoardOverlay, { controller, store, resolveNavigation: () => undefined }),
-        ),
-      ),
+  act(() => {
+    root.render(
+      createElement(BoardOverlay, {
+        controller,
+        store,
+        resolveNavigation: () => undefined,
+      }),
     )
-  }
-  render()
+  })
   mounted.push({ root, container })
-  return { container, controller, rerender: render }
+  return { container, controller }
 }
 
 describe('createOverlayController', () => {
@@ -97,145 +76,78 @@ describe('createOverlayController', () => {
 
   it('notifies subscribers only on an actual change', () => {
     const controller = createOverlayController()
-    const seen = vi.fn()
-    controller.subscribe(seen)
-    controller.close() // already closed
-    expect(seen).not.toHaveBeenCalled()
+    let calls = 0
+    controller.subscribe(() => {
+      calls += 1
+    })
+    controller.close()
+    expect(calls).toBe(0)
     controller.toggle()
-    expect(seen).toHaveBeenCalledTimes(1)
-  })
-
-  it('stops notifying after unsubscribe', () => {
-    const controller = createOverlayController()
-    const seen = vi.fn()
-    const off = controller.subscribe(seen)
-    off()
-    controller.toggle()
-    expect(seen).not.toHaveBeenCalled()
+    expect(calls).toBe(1)
   })
 })
 
-describe('BoardOverlay', () => {
-  it('renders the nav-row readout badge even while closed', async () => {
-    // The badge is the entry's whole point: the framework row can only carry
-    // icon + plain text, so the coloured counts live in the overlay layer and
-    // must be present without the panel being open.
-    const store = makeStore([])
-    const row = document.createElement('button')
-    row.dataset.statusBoardEntry = 'true'
-    // A laid-out row: measurement rejects a zero box, so the fixture has to
-    // report a real one.
-    row.getBoundingClientRect = () =>
-      ({ right: 240, top: 300, height: 32, width: 240, left: 0, bottom: 332, x: 0, y: 300, toJSON: () => ({}) }) as DOMRect
-    document.body.append(row)
-
-    const container = document.createElement('div')
-    document.body.append(container)
-    const root = createRoot(container)
-    act(() => {
-      root.render(
-        createElement(BoardOverlay, {
-          controller: createOverlayController(),
-          store,
-          resolveNavigation: () => undefined,
-        }),
-      )
-    })
-    mounted.push({ root, container })
-    // The measurement retries across frames; let one land.
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 40))
-    })
-
-    expect(container.querySelector('.status-board__row-badge')).not.toBeNull()
+describe('BoardOverlay (entry ②)', () => {
+  it('shows a floating button but no dialog while closed', () => {
+    const { container } = mount(makeStore([]))
+    expect(container.querySelector('.status-board__fab')).not.toBeNull()
     expect(container.querySelector('[role="dialog"]')).toBeNull()
-    expect(container.querySelectorAll('.status-board__metric')).toHaveLength(3)
-    row.remove()
-  })
-
-  it('renders no badge when there is no nav row to attach it to', () => {
-    // The collapsed rail draws no nav rows, and the badge must not float free.
-    const store = makeStore([])
-    const container = mount(
-      createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
-    )
-    expect(container.querySelector('.status-board__row-badge')).toBeNull()
-  })
-  it('draws no panel until opened', () => {
-    const store = makeStore([])
-    const container = mount(
-      createElement(BoardOverlay, { controller: createOverlayController(), store, resolveNavigation: () => undefined }),
-    )
-    // The stylesheet is always present now (the closed readout badge needs it),
-    // so "closed" means no dialog — not an empty container.
-    expect(container.querySelector('[role="dialog"]')).toBeNull()
-    expect(container.querySelector('.status-board__overlay')).toBeNull()
     expect(container.querySelector('style')).not.toBeNull()
   })
 
-  it('opens from the trigger as a labelled dialog and closes again', () => {
-    const store = makeStore([])
-    const { container } = mountPair(store)
+  it('shows the decision count on the floating button', () => {
+    const { container } = mount(makeStore([signal('d', { awaitingDecision: true })]))
+    expect(container.querySelector('.status-board__fab-badge')?.textContent).toBe('1')
+    expect(container.querySelector('.status-board__fab')?.getAttribute('aria-label')).toContain('Needs my decision 1')
+  })
 
+  it('opens and closes from the floating button', () => {
+    const { container, controller } = mount(makeStore([]))
+    const fab = container.querySelector<HTMLButtonElement>('.status-board__fab')
+    expect(fab?.getAttribute('aria-expanded')).toBe('false')
     act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      fab?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    const dialog = container.querySelector('[role="dialog"]')
-    expect(dialog).not.toBeNull()
-    expect(dialog?.getAttribute('aria-label')).toBe('Session Status Board')
-
+    expect(controller.getSnapshot()).toBe(true)
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(container.querySelector<HTMLButtonElement>('.status-board__fab')?.getAttribute('aria-expanded')).toBe('true')
     act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      container.querySelector<HTMLButtonElement>('.status-board__fab')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
     })
     expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('closes on Escape', () => {
-    const store = makeStore([])
-    const { container } = mountPair(store)
+  it('closes on Escape and returns focus to the floating button', () => {
+    const { container, controller } = mount(makeStore([]))
+    const fab = container.querySelector<HTMLButtonElement>('.status-board__fab')
     act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      fab?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull()
-
+    expect(document.activeElement).toBe(container.querySelector('[role="dialog"]'))
     act(() => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
+    expect(controller.getSnapshot()).toBe(false)
     expect(container.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.activeElement).toBe(fab)
   })
 
-  it('closes on a click outside the board', () => {
-    const store = makeStore([])
-    const { container } = mountPair(store)
+  it('closes on an outside press but stays open for a press inside the board', () => {
+    const { container } = mount(makeStore([]))
+    const fab = container.querySelector<HTMLButtonElement>('.status-board__fab')
     act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-
-    act(() => {
-      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    })
-    expect(container.querySelector('[role="dialog"]')).toBeNull()
-  })
-
-  it('stays open when the press lands inside the board', () => {
-    const store = makeStore([])
-    const { container } = mountPair(store)
-    act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      fab?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     const dialog = container.querySelector('[role="dialog"]')
     act(() => {
       dialog?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
     expect(container.querySelector('[role="dialog"]')).not.toBeNull()
-  })
-
-  it('takes focus on open so the keyboard user is not stranded', () => {
-    const store = makeStore([])
-    const { container } = mountPair(store)
     act(() => {
-      container.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     })
-    expect(document.activeElement).toBe(container.querySelector('[role="dialog"]'))
+    expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
 })

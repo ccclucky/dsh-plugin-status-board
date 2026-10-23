@@ -346,6 +346,10 @@ function sameState(left: BoardState, right: BoardState): boolean {
       if (a.title !== b.title) return false
       if (a.lastActivityAt !== b.lastActivityAt) return false
       if (a.workspacePath !== b.workspacePath) return false
+      // Question payloads are small and only present on decision rows; a
+      // structural compare keeps a changed option list from being dropped as
+      // "same row" (which would leave the card showing stale labels).
+      if (JSON.stringify(a.questions) !== JSON.stringify(b.questions)) return false
     }
   }
   return true

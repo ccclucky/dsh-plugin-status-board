@@ -85,6 +85,7 @@ function toEntry(signal: SessionSignal): BoardEntry {
     title: signal.title,
     workspacePath: signal.workspacePath,
     lastActivityAt: signal.lastActivityAt,
+    ...(signal.questions === undefined || signal.questions.length === 0 ? {} : { questions: signal.questions }),
   }
 }
 

@@ -4,6 +4,50 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-10-23
+
+The board now has **two entry surfaces**, split by job: the sidebar row expands
+an inline navigation tree, and a compact floating button opens the full board.
+
+### Added
+
+- **An inline status tree under the sidebar row.** Clicking `会话状态看板`
+  expands 3 folders — 待我决策 / 正在执行 / 近期记录 — each containing the
+  sessions classified into it. The tree is a *navigation* surface: a session row
+  opens that session, exactly like the Workspace browser. It renders no approval
+  or answer controls.
+- **True inline placement, with a fallback.** `sidebar.panellist` exposes only
+  the row's icon cell, so the tree is portaled into the sidebar's `nav` after
+  the row (pushing the Workspace list down, not covering it). If the shell no
+  longer exposes a nav, the same tree falls back to a fixed panel under the row.
+  The tree closes when the sidebar collapses to its 56px rail.
+- **A floating board button.** A compact button in the bottom-right corner opens
+  the current board as a popover. It replaces the old nav-row trigger; the board
+  content (filter + 3 boards) is unchanged.
+- **L2 question cards in the floating board.** Decision rows with a
+  `userQuestions` payload get an answer toggle. Continued questions submit their
+  full answer batch through `remote.userQuestions.answer`; open questions stay
+  read-only and link to the session's own card. The card supports options,
+  custom text, multi-select, per-call batches, submitting/sent/error states, and
+  is read-only when the composition exposes no answer Remote.
+
+### Changed
+
+- The sidebar row no longer opens the floating board; it toggles the tree. The
+  old row badge/measurement code and the overlay's row anchoring are removed.
+- The client now imports `react-dom` (for the tree portal); `react-dom` is
+  declared as a peer dependency.
+- The floating board is 380px wide and anchors above the floating button instead
+  of beside the nav row.
+- Locale dictionaries gained `tree.*`, `question.*` and `action.answer` keys.
+
+### Fixed
+
+- Question payloads are narrowed before rendering: malformed calls, empty
+  question ids and bad options are dropped without taking down the board.
+- Question changes now participate in the store's structural comparison, so a
+  changed option list re-renders the card instead of showing stale labels.
+
 ## [0.2.2] — 2026-10-23
 
 No change to the shipped code: every byte of the plugin is identical to 0.2.1.

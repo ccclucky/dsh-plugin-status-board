@@ -25,6 +25,12 @@ export interface LocaleFile {
     readonly shortTitle: string
     readonly subtitle: string
   }
+  readonly tree: {
+    /** Accessible name of the inline folder tree. */
+    readonly label: string
+    /** Accessible name of one session row in the tree. */
+    readonly session: string
+  }
   readonly bucket: {
     readonly decision: string
     readonly executing: string
@@ -39,6 +45,19 @@ export interface LocaleFile {
     readonly decisionUnit: string
     readonly executingUnit: string
     readonly recentUnit: string
+  }
+  readonly question: {
+    readonly label: string
+    readonly detail: string
+    readonly custom: string
+    readonly skipHint: string
+    readonly submit: string
+    readonly submitting: string
+    readonly sent: string
+    readonly openNotice: string
+    readonly openSession: string
+    readonly unavailable: string
+    readonly error: string
   }
   readonly state: {
     readonly loading: string
@@ -63,6 +82,8 @@ export interface LocaleFile {
     readonly filter: string
     /** Accessible label of the floating board's close control. */
     readonly close: string
+    /** Toggle that reveals a decision row's question card. */
+    readonly answer: string
   }
   readonly detail: {
     /** Label of the hover-card section naming a session's board. */
@@ -84,6 +105,8 @@ export type MessageKey =
   | `summary.${keyof LocaleFile['summary']}`
   | `time.${keyof LocaleFile['time']}`
   | `action.${keyof LocaleFile['action']}`
+  | `tree.${keyof LocaleFile['tree']}`
+  | `question.${keyof LocaleFile['question']}`
   | `detail.${keyof LocaleFile['detail']}`
   | `a11y.${keyof LocaleFile['a11y']}`
   | `panel.${keyof LocaleFile['panel']}`

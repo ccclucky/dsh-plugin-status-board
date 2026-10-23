@@ -31,7 +31,7 @@
  * @module dsh-plugin-status-board/client/session-source
  */
 
-import type { SessionSignal } from '../shared/types.ts'
+import type { ActiveQuestion, QuestionOption, SessionQuestion, SessionSignal } from '../shared/types.ts'
 
 /**
  * The `userQuestions` projection face.
@@ -74,6 +74,17 @@ export interface SessionSummaryLike {
   readonly lastActivityAt?: number | undefined
   /** Creation/update timestamp used when `lastActivityAt` is absent. */
   readonly updatedAt?: number | undefined
+  /**
+   * Projection values carried by the list row itself (the Host's list
+   * projection column). The resident `projectionsBySession` map is the
+   * fallback for compositions that only publish it there.
+   */
+  readonly projectionValues?: ProjectionValuesLike | undefined
+}
+
+/** The values slice of a session projection snapshot. */
+export interface ProjectionValuesLike {
+  readonly userQuestions?: UserQuestionsProjectionLike | undefined
 }
 
 /** The session-list snapshot the Client publishes (`SessionListState`). */
@@ -108,6 +119,79 @@ export function isAwaitingDecision(projection: ProjectionLike | undefined): bool
   return Array.isArray(active) && active.length > 0
 }
 
+/** Narrow an unknown value to a string, trimming nothing. */
+function stringOf(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+/** Whether a value is a plain record. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Read the selectable options of one question, dropping malformed entries. */
+function optionsOf(value: unknown): QuestionOption[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const options: QuestionOption[] = []
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue
+    const label = stringOf(candidate.label)
+    if (label === undefined) continue
+    const description = stringOf(candidate.description)
+    options.push({ label, ...(description === undefined ? {} : { description }) })
+  }
+  return options.length === 0 ? undefined : options
+}
+
+/** Read one question, or `undefined` when it cannot be rendered. */
+function questionOf(value: unknown): SessionQuestion | undefined {
+  if (!isRecord(value)) return undefined
+  const id = stringOf(value.id)
+  const question = stringOf(value.question)
+  if (id === undefined || question === undefined) return undefined
+  const detail = stringOf(value.detail)
+  const header = stringOf(value.header)
+  const options = optionsOf(value.options)
+  const multiSelect = typeof value.multiSelect === 'boolean' ? value.multiSelect : undefined
+  return {
+    id,
+    question,
+    ...(detail === undefined ? {} : { detail }),
+    ...(header === undefined ? {} : { header }),
+    ...(options === undefined ? {} : { options }),
+    ...(multiSelect === undefined ? {} : { multiSelect }),
+  }
+}
+
+/**
+ * Reduce the `userQuestions` projection into renderable question calls.
+ *
+ * The wire value is narrowed instead of trusted: an older Host, a proxy, or a
+ * future schema can hand the board anything, and a malformed question must not
+ * take down the row. An entry missing its call id, state, or every renderable
+ * question is skipped; callers keep the raw `isAwaitingDecision` check for
+ * classification so a malformed-but-present call still lands on the decision
+ * board (and can be opened in the session) instead of silently disappearing.
+ */
+export function questionsOf(projection: ProjectionLike | undefined): readonly ActiveQuestion[] {
+  const active = projection?.values?.userQuestions?.active
+  if (!Array.isArray(active)) return []
+  const calls: ActiveQuestion[] = []
+  for (const candidate of active) {
+    if (!isRecord(candidate)) continue
+    const callId = stringOf(candidate.callId)
+    const state = candidate.state === 'open' || candidate.state === 'continued' ? candidate.state : undefined
+    if (callId === undefined || state === undefined || !Array.isArray(candidate.questions)) continue
+    const questions: SessionQuestion[] = []
+    for (const item of candidate.questions) {
+      const question = questionOf(item)
+      if (question !== undefined) questions.push(question)
+    }
+    if (questions.length > 0) calls.push({ callId, questions, state })
+  }
+  return calls
+}
+
 /** Whether a summary describes a subagent child rather than a top-level session. */
 export function isSubagentChild(summary: SessionSummaryLike): boolean {
   return summary.origin === 'subagent' || (typeof summary.parentId === 'string' && summary.parentId.length > 0)
@@ -130,6 +214,20 @@ function lastActivityOf(summary: SessionSummaryLike): number {
     if (typeof candidate === 'number' && Number.isFinite(candidate) && candidate > 0) return candidate
   }
   return 0
+}
+
+/**
+ * Resolve the projection values for one row.
+ *
+ * The Host publishes them on the row (`projectionValues`); older compositions
+ * expose the resident store through `projectionsBySession`. Reading both keeps
+ * the question card working across that shape change without touching the
+ * classifier.
+ */
+function projectionOf(summary: SessionSummaryLike, id: string, list: SessionListLike | undefined): ProjectionLike | undefined {
+  const rowQuestions = summary.projectionValues?.userQuestions
+  if (rowQuestions !== undefined) return { values: { userQuestions: rowQuestions } }
+  return list?.projectionsBySession?.[id]
 }
 
 /**
@@ -159,13 +257,15 @@ export function collectSessionSignals(list: SessionListLike | undefined): Sessio
     if (summary.blank === true) continue
     seen.add(summary.id)
 
-    const projection = list?.projectionsBySession?.[summary.id]
+    const projection = projectionOf(summary, summary.id, list)
+    const questions = questionsOf(projection)
     signals.push({
       id: summary.id,
       title: titleOf(summary, summary.id),
       workspacePath: typeof summary.cwd === 'string' && summary.cwd.length > 0 ? summary.cwd : undefined,
       running: summary.running === true,
       awaitingDecision: isAwaitingDecision(projection),
+      ...(questions.length === 0 ? {} : { questions }),
       lastActivityAt: lastActivityOf(summary),
     })
   }

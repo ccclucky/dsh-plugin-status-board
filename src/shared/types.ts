@@ -12,6 +12,57 @@ export const BUCKET_IDS = ['decision', 'executing', 'recent'] as const
 /** Identity of one board. */
 export type BucketId = (typeof BUCKET_IDS)[number]
 
+
+/** One selectable answer to a question. */
+export interface QuestionOption {
+  /** Label sent back as the selected value. */
+  readonly label: string
+  /** Optional explanation shown under the label. */
+  readonly description?: string | undefined
+}
+
+/** One question in an `ask_user_question` batch. */
+export interface SessionQuestion {
+  readonly id: string
+  readonly question: string
+  /** Long-form detail (for example the plan under review). */
+  readonly detail?: string | undefined
+  /** Short heading the asker supplied. */
+  readonly header?: string | undefined
+  readonly options?: readonly QuestionOption[] | undefined
+  readonly multiSelect?: boolean | undefined
+}
+
+/** State of one answerable question call. */
+export type QuestionState = 'open' | 'continued'
+
+/** One `ask_user_question` call currently waiting for the user. */
+export interface ActiveQuestion {
+  /** Tool-call identity the answer must name. */
+  readonly callId: string
+  /** Questions in this batch; normally one. */
+  readonly questions: readonly SessionQuestion[]
+  /**
+   * `open` while the foreground wait is still live, `continued` once the tool
+   * returned pending or the original process ended.
+   */
+  readonly state: QuestionState
+}
+
+/** One answer in an answer batch. */
+export interface QuestionAnswer {
+  readonly id: string
+  /** Selected option labels; empty means "skipped". */
+  readonly selected: readonly string[]
+  /** Free-text answer, sent alongside or instead of the options. */
+  readonly custom?: string | undefined
+}
+
+/** The complete structured answer for one question call. */
+export interface AnswerBatch {
+  readonly answers: readonly QuestionAnswer[]
+}
+
 /**
  * What one Session looks like to the classifier.
  *
@@ -48,6 +99,12 @@ export interface SessionSignal {
    */
   readonly awaitingDecision: boolean
   /**
+   * Answerable question calls carried by the Session's `userQuestions`
+   * projection, in ask order. Only populated while a human answer is pending;
+   * `undefined`/empty means the Session has no question card to render.
+   */
+  readonly questions?: readonly ActiveQuestion[] | undefined
+  /**
    * Epoch milliseconds of the Session's newest observed activity. `0` means
    * "not known", which keeps a Session visible instead of silently dropping
    * it.
@@ -64,6 +121,8 @@ export interface BoardEntry {
   readonly title: string
   readonly workspacePath?: string | undefined
   readonly lastActivityAt: number
+  /** Answerable question calls, when the Session currently has one. */
+  readonly questions?: readonly ActiveQuestion[] | undefined
 }
 
 /** One board: its rows plus how many rows the cap hid. */

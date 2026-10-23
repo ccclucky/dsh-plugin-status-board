@@ -76,10 +76,10 @@ describe('built artifacts', () => {
     expect(client).toContain('会话状态看板')
   })
 
-  it('registers the panel through both slots under one id', () => {
+  it('registers both entry seats under one id', () => {
     const client = readFileSync(clientPath, 'utf8')
     expect(client).toContain('sidebar.panellist')
-    expect(client).toContain('main')
+    expect(client).toContain('shell.overlay')
     expect(client).toContain('status-board')
   })
 

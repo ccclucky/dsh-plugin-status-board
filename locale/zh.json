@@ -44,7 +44,8 @@
     "open": "打开会话",
     "refresh": "刷新看板",
     "filter": "筛选会话",
-    "close": "收起看板"
+    "close": "收起看板",
+    "answer": "回答"
   },
   "detail": {
     "label": "看板："
@@ -55,5 +56,22 @@
     "decision": "待决策",
     "idle": "空闲",
     "unknown": "状态未知"
+  },
+  "tree": {
+    "label": "会话状态目录",
+    "session": "打开会话「{name}」"
+  },
+  "question": {
+    "label": "待你回答",
+    "detail": "查看题目详情",
+    "custom": "其他回答…",
+    "skipHint": "不选视为跳过",
+    "submit": "提交回答",
+    "submitting": "提交中…",
+    "sent": "已提交，等待 Agent 接收",
+    "openNotice": "这道题仍在会话前台等待，请打开会话回答。",
+    "openSession": "打开会话",
+    "unavailable": "当前环境没有回答通道，请打开会话回答。",
+    "error": "提交失败：{message}"
   }
 }

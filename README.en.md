@@ -23,7 +23,7 @@
 
 | Board | Rule | The question it answers |
 | :--- | :--- | :--- |
-| **Needs my decision** | The session is waiting on your reply: a tool parked on `ask_user_question` (plan review included), or a Lead session holding a ready-and-unclaimed team task | “What must I handle now?” |
+| **Needs my decision** | The session has an unanswered `ask_user_question` in its `userQuestions` projection (plan review included) | “What must I handle now?” |
 | **Running** | The agent is working and needs nothing from you | “What is running in the background?” |
 | **Recent records** | Everything else that saw activity inside the time window | “What moved recently?” |
 
@@ -31,16 +31,19 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 > **Demo placeholders**
 > Screenshots/GIF pending: `docs/demo-light.png`, `docs/demo-dark.png`, `docs/demo-collapse.gif`.
-> Wide screens render the three boards as a multi-column grid; at ≤720px they stack into one column.
+> The sidebar tree is a single nested column; the floating board is a fixed single column, about 380px wide.
 
 ---
 
 ## Features
 
-- **Three responsive collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
+- **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right button opens the **full board**.
+- **The sidebar tree is navigation only** — click a session exactly like the Workspace browser; no approval or answer controls live in the tree.
+- **Inline question card in the floating board** — decision rows expand; `continued` questions submit in place, while `open` questions point at the session's own card.
+- **Three collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
 - **Correct precedence** — a session waiting on your decision lands on the decision board even while its agent is still running; it never drowns in "Running".
 - **Live, not polled** — subscribes to the session list Harness already publishes. No polling, no re-scanning session logs.
-- **Remembers your collapse choices** — persisted per browser in `localStorage`.
+- **Remembers your collapse choices** — the 3 sidebar folders and 3 board sections share one set of choices, persisted per browser in `localStorage`.
 - **Bilingual** — UI copy and the Plugin Manager's title/description follow the Harness language setting (Chinese / English).
 - **Theme-aware** — every colour comes from Harness theme tokens, so light and dark themes follow automatically.
 - **Keyboard and screen-reader accessible** — each board's title is a real `<h2>` wrapping a disclosure `<button>` (the WAI-ARIA accordion pattern), with `aria-expanded` and an `aria-controls` that always resolves; the label announces the board, the action and the row count. The panel is named via `aria-labelledby`, and DOM ids come from `useId`, so two mounted panels never collide.
@@ -54,7 +57,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 1. Open the DSH Web UI → **Settings → Plugins**.
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
-3. Reload the page. A **Session Status Board** row appears in the sidebar nav list, right under the shipped rows, with three coloured dot counts at its right edge (decision · running · recent; the figures themselves stay in the text colour, and an empty board dims to grey). Click the row and the board opens beside it; press `Esc`, click outside the panel, or use its × to dismiss.
+3. Reload the page. A **Session Status Board** row appears in the sidebar nav list. Clicking it expands 3 status folders; clicking a session opens it. The round button in the bottom-right corner opens the full board. Press `Esc`, click outside the panel, or use its × to dismiss.
 
 ### Option 2 — CLI, from npm (recommended for scripted setups)
 
@@ -137,8 +140,10 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
                                        │                         ▼    │
                                        │     classify / sort / cap    │
                                        │                         ▼    │
-                                       │  sidebar.panellist → nav row  │
-                                       │  shell.overlay    → panel     │
+                                       │  sidebar.panellist → row click│
+                                       │    └─ inline tree (navigation)│
+                                       │  shell.overlay    → bottom-   │
+                                       │    right button → board + card│
                                        └──────────────────────────────┘
 ```
 
@@ -155,7 +160,7 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 184 cases
+pnpm test        # vitest, 187 cases
 pnpm build       # clean → declarations → both halves → Client envelope wrap → self-check
 pnpm verify      # artefact self-check only (run pnpm build first)
 pnpm test:watch  # watch mode
@@ -174,14 +179,16 @@ dsh-plugin-status-board/
 │   │   ├── route.ts             #   cross-process constants
 │   │   └── types.ts             #   shared type contract
 │   └── client/
-│       ├── index.tsx            # slot registration (nav row + overlay + dicts)
-│       ├── overlay.tsx          # nav-row entry + floating panel (click trap, anchoring, dismissal)
-│       ├── Panel.tsx            # the three-board view
+│       ├── index.tsx            # slot registration (sidebar row + floating button + dicts)
+│       ├── overlay.tsx          # row capture + inline tree portal + floating button/board
+│       ├── Tree.tsx             # the 3 status folders + session rows (navigation only)
+│       ├── Panel.tsx            # floating board + decision-row card entry
+│       ├── QuestionCard.tsx     # L2 card (continued submits / open jumps)
 │       ├── store.ts             # external store (useSyncExternalStore)
-│       ├── session-source.ts    # the single runtime-snapshot adapter
+│       ├── session-source.ts    # runtime snapshot + userQuestions → classifier/card input
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 184 unit tests
+├── tests/                       # 187 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.mjs            # two independent builds (plain ESM; see its header)
@@ -194,11 +201,11 @@ dsh-plugin-status-board/
 | `board.test.ts` | precedence, stable ordering, time window, truncation counts, collapse state |
 | `config.test.ts` | defaults, clamping, wrong-type fallback |
 | `i18n.test.ts` | zh/en key parity, required-key validation, single-pass interpolation, relative time |
-| `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, malformed rows |
+| `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, question-payload narrowing, malformed rows |
 | `store.test.ts` | subscriptions, change detection, collapse persistence, late config must not clobber a click |
-| `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens |
-| `overlay.test.tsx` | panel open/close, Escape and outside-press dismissal, focus into the panel, controller semantics |
-| `nav-entry.test.tsx` | the row swallows its own click (no navigation), count description, framework handler restored on unmount |
+| `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens, card expand/submit |
+| `overlay.test.tsx` | floating-button open/close, Escape and outside-press dismissal, focus in/out, decision badge, controller semantics |
+| `nav-entry.test.tsx` | row click capture, inline tree portal, navigation-only rows, 56px rail hiding, no-nav fallback, cleanup |
 | `host.test.ts` | GET/HEAD/405 handling, Allow header, effect cleanup, late-mounting webServer |
 | `manifest.test.ts` | manifest / patch / locale / icon / MIT LICENSE consistency |
 | `artifacts.test.ts` | built output: real Host exports, Client envelope, external React, inlined dicts, unrewritten styles |
@@ -216,13 +223,13 @@ By design. "The agent is still working" and "it cannot proceed without your call
 Team-task `pending` rows deliberately play no part: on disk a task row carries only `id/revision/subject/status` (there is no `ready` field), and a finished ticket keeps its rows `pending` forever. An earlier version keyed on them and pinned sessions that had ended days earlier to the decision board.
 
 **What happens when I click a session row?**
-It navigates through the Harness `uiWorkspace.openSession` service. When that service is not part of the composition, rows render as static text rather than as buttons that do nothing.
+Both the sidebar tree and the floating board navigate through the Harness `uiWorkspace.openSession` service. When that service is not part of the composition, rows render as static text rather than as buttons that do nothing.
 
 **Where is the collapse state stored?**
-Browser `localStorage` under `dsh-plugin-status-board.collapse.v1`. Clear that key to fall back to the configured default. If storage is unavailable (private mode), the choice degrades to this page's lifetime automatically.
+Browser `localStorage` under `dsh-plugin-status-board.collapse.v1`. The three sidebar folders and the three board sections share this state; clear the key to fall back to the configured default. If storage is unavailable (private mode), the choice degrades to this page's lifetime automatically.
 
 **What is left behind after uninstall?**
-Nothing. The styles are a `<style>` element inside the panel component, so unmounting removes them; every slot registration and subscription is owned by a `ctx.effect`, so unload releases it.
+Nothing. The styles are a `<style>` element inside the panel component, so unmounting removes them; the tree portal, the row click capture and its `MutationObserver` are released in the cleanup function; every slot registration and subscription is owned by a `ctx.effect`.
 
 ---
 

@@ -153,6 +153,34 @@ describe('createBoardStore', () => {
     store.dispose()
   })
 
+  it('re-renders when a question payload changes', () => {
+    const withQuestion = (label: string): SessionSummaryLike =>
+      row('d', {
+        projectionValues: {
+          userQuestions: {
+            active: [
+              {
+                callId: 'call-1',
+                state: 'continued',
+                questions: [{ id: 'q1', question: 'Proceed?', options: [{ label }] }],
+              },
+            ],
+          },
+        },
+      })
+    const sessions = mutableSessions([withQuestion('Approve')])
+    const { store } = build({ sessions: sessions.service })
+    const listener = vi.fn()
+    store.subscribe(listener)
+
+    sessions.publish([withQuestion('Ship it')])
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot().board.buckets[0]?.entries[0]?.questions?.[0]?.questions[0]?.options?.[0]?.label).toBe(
+      'Ship it',
+    )
+    store.dispose()
+  })
+
   it('does not notify when a publication changes nothing visible', () => {
     const sessions = mutableSessions([row('r1')])
     const { store } = build({ sessions: sessions.service })

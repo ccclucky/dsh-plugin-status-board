@@ -44,7 +44,8 @@
     "open": "Open session",
     "refresh": "Refresh board",
     "filter": "Filter sessions",
-    "close": "Hide board"
+    "close": "Hide board",
+    "answer": "Answer"
   },
   "detail": {
     "label": "Board:"
@@ -55,5 +56,22 @@
     "decision": "Needs decision",
     "idle": "Idle",
     "unknown": "State unknown"
+  },
+  "tree": {
+    "label": "Session status folders",
+    "session": "Open session “{name}”"
+  },
+  "question": {
+    "label": "Needs your answer",
+    "detail": "View question detail",
+    "custom": "Other answer…",
+    "skipHint": "Leave empty to skip",
+    "submit": "Submit answer",
+    "submitting": "Submitting…",
+    "sent": "Submitted; waiting for the agent",
+    "openNotice": "This question is still waiting in the session. Open it to answer.",
+    "openSession": "Open session",
+    "unavailable": "Answering is unavailable here. Open the session to answer.",
+    "error": "Submit failed: {message}"
   }
 }

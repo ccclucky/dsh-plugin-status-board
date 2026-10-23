@@ -11,6 +11,7 @@ import {
   collectSessionSignals,
   isAwaitingDecision,
   isSubagentChild,
+  questionsOf,
 } from '../src/client/session-source.ts'
 import type { ProjectionLike, SessionListLike, SessionSummaryLike } from '../src/client/session-source.ts'
 
@@ -163,5 +164,141 @@ describe('collectSessionSignals', () => {
       list([summary({ id: 'a' })], { a: { values: { userQuestions: { active: [{ id: 'q' }] } } } }),
     )
     expect(signals[0]?.awaitingDecision).toBe(true)
+  })
+})
+
+describe('questionsOf', () => {
+  it('reduces the userQuestions projection into renderable calls', () => {
+    const projection = {
+      values: {
+        userQuestions: {
+          active: [
+            {
+              callId: 'call-1',
+              state: 'continued',
+              questions: [
+                {
+                  id: 'q1',
+                  header: 'Plan review',
+                  question: 'Proceed with the plan?',
+                  detail: 'The full plan text.',
+                  options: [
+                    { label: 'Approve', description: 'Ship it' },
+                    { label: 'Request changes' },
+                  ],
+                  multiSelect: false,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }
+    expect(questionsOf(projection)).toEqual([
+      {
+        callId: 'call-1',
+        state: 'continued',
+        questions: [
+          {
+            id: 'q1',
+            header: 'Plan review',
+            question: 'Proceed with the plan?',
+            detail: 'The full plan text.',
+            options: [{ label: 'Approve', description: 'Ship it' }, { label: 'Request changes' }],
+            multiSelect: false,
+          },
+        ],
+      },
+    ])
+  })
+
+  it('accepts a real persisted ask_user_question batch', () => {
+    // Copied from a real session log: the tool arguments and option labels are
+    // verbatim, so this locks the adapter to the payload the Host actually
+    // writes rather than to a synthetic shape.
+    const projection = {
+      values: {
+        userQuestions: {
+          active: [
+            {
+              callId: 'call_00_4GvK4kHkD8aFkEMUqs3X5286',
+              state: 'continued',
+              questions: [
+                {
+                  id: 'restart',
+                  header: '重启生效',
+                  question: '0.2.2 已装到 profile，但运行中的宿主仍加载 0.1.0，需重启桌面端才生效。怎么处理？',
+                  options: [
+                    {
+                      label: '我自己重启（推荐）',
+                      description: '你手动退出并重开 DeepSeek Harness，本次会话不中断，重启后生效。',
+                    },
+                    {
+                      label: '由我自动重启',
+                      description: '我用脚本退出并重开 App，本会话连接会短暂断开，重连后继续。',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }
+    const calls = questionsOf(projection)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.callId).toBe('call_00_4GvK4kHkD8aFkEMUqs3X5286')
+    expect(calls[0]?.questions[0]?.options?.[0]?.label).toBe('我自己重启（推荐）')
+  })
+
+  it('drops malformed calls instead of failing the whole board', () => {
+    expect(questionsOf(undefined)).toEqual([])
+    expect(questionsOf({ values: { userQuestions: { active: 'nope' as never } } })).toEqual([])
+    expect(
+      questionsOf({
+        values: {
+          userQuestions: {
+            active: [
+              { callId: 'missing-state', questions: [{ id: 'q', question: 'x' }] },
+              { callId: 'bad-question', state: 'open', questions: [{ id: '', question: 'x' }] },
+              { callId: 'ok', state: 'open', questions: [{ id: 'q', question: 'x', options: [{ label: '' }] }] },
+            ],
+          },
+        },
+      }),
+    ).toEqual([{ callId: 'ok', state: 'open', questions: [{ id: 'q', question: 'x' }] }])
+  })
+
+  it('prefers the row projection and falls back to the resident projection map', () => {
+    const viaRow = collectSessionSignals({
+      byId: {
+        a: {
+          id: 'a',
+          displayTitle: 'A',
+          projectionValues: {
+            userQuestions: {
+              active: [{ callId: 'c', state: 'continued', questions: [{ id: 'q', question: 'Row?' }] }],
+            },
+          },
+        },
+      },
+      phase: 'ready',
+    })
+    expect(viaRow[0]?.questions?.[0]?.callId).toBe('c')
+
+    const viaResident = collectSessionSignals({
+      byId: { b: { id: 'b', displayTitle: 'B' } },
+      phase: 'ready',
+      projectionsBySession: {
+        b: {
+          values: {
+            userQuestions: {
+              active: [{ callId: 'd', state: 'open', questions: [{ id: 'q', question: 'Resident?' }] }],
+            },
+          },
+        },
+      },
+    })
+    expect(viaResident[0]?.questions?.[0]?.callId).toBe('d')
   })
 })

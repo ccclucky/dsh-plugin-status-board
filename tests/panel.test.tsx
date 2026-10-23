@@ -405,3 +405,109 @@ describe('BoardGlyph', () => {
     expect(markup).toContain('width="20"')
   })
 })
+
+describe('question card on a decision row', () => {
+  function entryWithQuestion(state: 'open' | 'continued') {
+    return {
+      id: 'decision-session',
+      title: 'Needs a call',
+      lastActivityAt: NOW,
+      questions: [
+        {
+          callId: 'call-1',
+          state,
+          questions: [
+            {
+              id: 'q1',
+              header: 'Plan review',
+              question: 'Proceed with the plan?',
+              options: [{ label: 'Approve' }, { label: 'Request changes' }],
+            },
+          ],
+        },
+      ],
+    }
+  }
+
+  it('expands a continued question and submits the whole batch', async () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const answerQuestion = vi.fn().mockResolvedValue(undefined)
+    act(() => {
+      root.render(
+        createElement(
+          'ul',
+          null,
+          createElement(Row, {
+            entry: entryWithQuestion('continued') as never,
+            bucket: 'decision' as const,
+            translate: createTranslate('en'),
+            now: NOW,
+            onOpen: () => {},
+            answerQuestion,
+          }),
+        ),
+      )
+    })
+    const toggle = container.querySelector<HTMLButtonElement>('.status-board__answer-toggle')
+    expect(toggle).not.toBeNull()
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+    act(() => {
+      toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    const card = container.querySelector('.status-board__qcard')
+    expect(card).not.toBeNull()
+    const option = Array.from(container.querySelectorAll<HTMLButtonElement>('.status-board__q-option')).find(button =>
+      button.textContent?.includes('Approve'),
+    )
+    act(() => {
+      option?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('.status-board__q-submit')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+      await Promise.resolve()
+    })
+    expect(answerQuestion).toHaveBeenCalledWith('decision-session', 'call-1', {
+      answers: [{ id: 'q1', selected: ['Approve'] }],
+    })
+    expect(container.textContent).toContain('Submitted; waiting for the agent')
+    act(() => root.unmount())
+    container.remove()
+  })
+
+  it('renders an open question read-only and points at the session', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    act(() => {
+      root.render(
+        createElement(
+          'ul',
+          null,
+          createElement(Row, {
+            entry: entryWithQuestion('open') as never,
+            bucket: 'decision' as const,
+            translate: createTranslate('en'),
+            now: NOW,
+            onOpen: () => {},
+            answerQuestion: vi.fn(),
+          }),
+        ),
+      )
+    })
+    act(() => {
+      container.querySelector<HTMLButtonElement>('.status-board__answer-toggle')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+    })
+    expect(container.textContent).toContain('still waiting in the session')
+    expect(container.querySelector('.status-board__q-submit')).toBeNull()
+    expect(container.querySelector<HTMLButtonElement>('.status-board__q-option')?.disabled).toBe(true)
+    act(() => root.unmount())
+    container.remove()
+  })
+})

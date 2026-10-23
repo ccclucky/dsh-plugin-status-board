@@ -1,32 +1,19 @@
 /**
- * The sidebar entry and its floating board.
+ * The two entry surfaces.
  *
- * Shape A (chosen from the rendered option board): the entry is a *readout* in
- * the sidebar nav list, directly under the shipped rows, showing the three
- * board counts. Opening it shows the board as a frame-wide floating panel.
+ * Entry ① is the sidebar row: its click expands a real, inline status tree
+ * (ported into the sidebar's `nav`) and never navigates. Entry ② is a compact
+ * floating button: clicking it opens the current board as a popover.
  *
- * Where the numbers come from: the sidebar's nav rows are rendered by the
- * framework from `sidebar.panellist`, and a click there normally selects a main
- * column. This plugin has no main column, so its icon component captures the
- * pointer and opens the floating board instead — which is why the entry can sit
- * in the nav list and still not navigate anywhere.
+ * Both surfaces are separate slot registrations with no shared React parent, so
+ * the open state lives in small external controllers and is read through
+ * `useSyncExternalStore`. The tree and the board share the store, not state:
+ * each controller owns its own open/closed bit.
  *
- * The counts live in the entry's own `label` thunk? No: the framework draws the
- * label as plain text. So the numbers ride in the accessible name and as a
- * trailing badge drawn inside the icon cell, which is the only part this plugin
- * renders.
- *
- * Accessibility (WAI-ARIA disclosure/popover pattern):
- * - the trigger is a real `<button>` carrying `aria-expanded` and `aria-controls`;
- * - the panel is a labelled `dialog` that takes focus when it opens, so a
- *   keyboard user is not left behind on the trigger;
- * - closing returns focus to the trigger, so the next Tab continues where the
- *   user was rather than at the top of the document.
  * @module dsh-plugin-status-board/client/overlay
  */
 
 import {
-  useCallback,
   useEffect,
   useId,
   useRef,
@@ -34,17 +21,20 @@ import {
   useSyncExternalStore,
   type ReactElement,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { createTranslate } from '../shared/i18n.ts'
-import type { BoardStore } from './store.ts'
+import type { BoardState, BoardStore } from './store.ts'
 import { BoardGlyph, BoardPanel } from './Panel.tsx'
+import { StatusTree } from './Tree.tsx'
+import type { AnswerQuestion } from './QuestionCard.tsx'
 import { PANEL_CSS } from './styles.ts'
 
 /**
- * Open/closed state for the floating board.
+ * Open/closed state for one disclosure surface.
  *
  * A tiny observable rather than React state because the trigger and the panel
- * are two separate slot registrations: they have no common React parent, so the
- * state has to live above both. `getSnapshot` returns a primitive, which keeps
+ * are separate slot registrations (or, for the tree, a portal target outside
+ * React's managed children). `getSnapshot` returns a primitive, which keeps
  * `useSyncExternalStore` from re-rendering on every read.
  */
 export interface OverlayController {
@@ -54,9 +44,9 @@ export interface OverlayController {
   close(): void
 }
 
-/** Create one controller; `apply` owns it for the module's lifetime. */
-export function createOverlayController(): OverlayController {
-  let open = false
+/** Create one controller; `apply` owns one per surface for the module lifetime. */
+export function createOverlayController(initial = false): OverlayController {
+  let open = initial
   const listeners = new Set<() => void>()
   const publish = (next: boolean): void => {
     if (open === next) return
@@ -76,71 +66,8 @@ export function createOverlayController(): OverlayController {
   }
 }
 
-/**
- * The sidebar-nav entry.
- *
- * Shape A: the entry sits in the nav list, directly under the shipped rows, and
- * reads out the three board counts. Opening it shows the board as a frame-wide
- * floating panel.
- *
- * The one hard part: `sidebar.panellist` rows are rendered by the framework, and
- * a click there normally selects a main column. This plugin has no main column,
- * so the component (which the framework renders *inside* that row's button)
- * captures the row's click and opens the floating board instead. The capture
- * listener runs on the ancestor button itself, before the shell's own handler,
- * and marks the button so the panel's outside-click guard does not treat the
- * entry as "outside".
- *
- * Counts cannot be drawn here: this component only gets the row's icon cell. The
- * numbers therefore ride in the row's label, which `apply` builds as a thunk.
- */
-export function BoardNavEntry({
-  controller,
-  store,
-  size,
-}: {
-  readonly controller: OverlayController
-  readonly store: BoardStore
-  readonly size: number
-}): ReactElement {
-  const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
-  const translate = createTranslate(state.locale)
-  const iconRef = useRef<HTMLSpanElement | null>(null)
-
-  const counts = countBoards(state)
-  const panelId = `status-board-overlay-${useId()}`
-  const aria = describeCounts(translate, counts)
-
-  // Capture the row's click so it opens the board instead of navigating.
-  useEffect(() => {
-    const row = iconRef.current?.closest('button')
-    if (row === null || row === undefined) return undefined
-    // Marked so the panel's outside-click guard can tell this entry apart from
-    // the rest of the page.
-    row.dataset.statusBoardEntry = 'true'
-    row.setAttribute('aria-expanded', String(open))
-    row.setAttribute('aria-controls', panelId)
-    row.setAttribute('aria-label', aria)
-    row.title = aria
-    const capture = (event: Event): void => {
-      event.preventDefault()
-      event.stopPropagation()
-      controller.toggle()
-    }
-    row.addEventListener('click', capture, true)
-    return () => row.removeEventListener('click', capture, true)
-  }, [controller, open, panelId, aria])
-
-  return (
-    <span ref={iconRef} className="status-board__nav-glyph" data-open={open}>
-      <BoardGlyph size={size} />
-    </span>
-  )
-}
-
 /** The three board counts, read from the same board the panel renders. */
-function countBoards(state: ReturnType<BoardStore['getSnapshot']>): Record<'decision' | 'executing' | 'recent', number> {
+function countBoards(state: BoardState): Record<'decision' | 'executing' | 'recent', number> {
   const countOf = (id: 'decision' | 'executing' | 'recent'): number => {
     const board = state.board.buckets.find(candidate => candidate.id === id)
     return board === undefined ? 0 : board.entries.length
@@ -148,7 +75,7 @@ function countBoards(state: ReturnType<BoardStore['getSnapshot']>): Record<'deci
   return { decision: countOf('decision'), executing: countOf('executing'), recent: countOf('recent') }
 }
 
-/** Accessible name that states every count, since the row is icon+text only. */
+/** Accessible name that states every count, since the trigger is icon+text only. */
 export function describeCounts(
   translate: ReturnType<typeof createTranslate>,
   counts: Record<'decision' | 'executing' | 'recent', number>,
@@ -161,114 +88,233 @@ export function describeCounts(
   ].join('，')
 }
 
-/**
- * Compact count string for the nav row's label.
- *
- * The row has no slot for a badge — the framework draws the label as text — so
- * the numbers have to be part of the label. Ordered decision, executing, recent
- * and separated by a middle dot so the three figures stay distinguishable at a
- * glance without any colour.
- */
-export function describeCountsShort(
-  _translate: ReturnType<typeof createTranslate>,
-  state: ReturnType<BoardStore['getSnapshot']>,
-): string {
-  const counts = countBoards(state)
-  return `${counts.decision} · ${counts.executing} · ${counts.recent}`
+/** Find the direct child of `nav` that contains `row`, if one exists. */
+function directChildOf(nav: HTMLElement, row: HTMLElement): HTMLElement | null {
+  let cursor: HTMLElement | null = row
+  while (cursor !== null && cursor.parentElement !== nav) cursor = cursor.parentElement
+  return cursor
 }
 
+/** Insert the tree container after the row's nav child, or append it. */
+function insertTree(nav: HTMLElement, container: HTMLElement, anchor: HTMLElement | null): void {
+  if (anchor !== null && anchor.parentElement === nav) nav.insertBefore(container, anchor.nextSibling)
+  else nav.append(container)
+}
 
 /**
- * The floating board.
+ * The sidebar-nav entry (entry ①).
  *
- * `shell.overlay` is a click-through layer covering the whole frame, so this
- * root opts back into pointer events.
+ * The framework renders this component inside its own nav-row button and gives
+ * the plugin only the icon cell. The row's click is captured to toggle the tree
+ * and to stop the shell from selecting a main column.
  *
- * Position: measured from the entry's row when it opens, so the panel appears
- * beside the row that was clicked rather than at a fixed spot in the frame. A
- * fixed anchor looked like the panel came from nowhere — the entry sits near the
- * top of the sidebar, and the first cut had it pinned to the bottom of the
- * window.
+ * The tree itself has no nested slot: it is a portal into the sidebar's
+ * `nav.panelList`, inserted after this row. If that DOM cannot be found (a
+ * future shell change), the same tree is rendered as a fixed panel under the
+ * row instead of silently disappearing.
+ */
+export function BoardNavEntry({
+  tree,
+  store,
+  size,
+  resolveNavigation,
+}: {
+  readonly tree: OverlayController
+  readonly store: BoardStore
+  readonly size: number
+  readonly resolveNavigation: () => ((sessionId: string) => void) | undefined
+}): ReactElement {
+  const open = useSyncExternalStore(tree.subscribe, tree.getSnapshot, tree.getSnapshot)
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const translate = createTranslate(state.locale)
+  const iconRef = useRef<HTMLSpanElement | null>(null)
+  const warned = useRef(false)
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  const [fallback, setFallback] = useState<{ left: number; top: number; width: number } | null>(null)
+
+  // The shell passes size 18 for the collapsed rail and 16 for the wide column.
+  // Keeping the tree out of the rail is deliberate: 56px cannot show a nested
+  // list, and the row's click then only prevents a dead navigation.
+  const collapsed = size >= 18
+  const counts = countBoards(state)
+  const treeId = `status-board-tree-${useId()}`
+  const aria = describeCounts(translate, counts)
+
+  // Capture the framework row's click: it must not navigate. In the collapsed
+  // rail there is no room for the tree, so the click is simply swallowed.
+  useEffect(() => {
+    const row = iconRef.current?.closest('button')
+    if (row === null || row === undefined) return undefined
+    row.dataset.statusBoardEntry = 'true'
+    row.title = aria
+    row.setAttribute('aria-label', aria)
+    const previousPosition = row.style.position
+    const previousPaddingRight = row.style.paddingRight
+    if (collapsed) {
+      row.removeAttribute('aria-expanded')
+      row.removeAttribute('aria-controls')
+    } else {
+      row.setAttribute('aria-expanded', String(open))
+      row.setAttribute('aria-controls', treeId)
+      // Reserve room for the right-edge chevron drawn inside this component.
+      row.style.position = 'relative'
+      row.style.paddingRight = '24px'
+    }
+    const capture = (event: Event): void => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!collapsed) tree.toggle()
+    }
+    row.addEventListener('click', capture, true)
+    return () => {
+      row.removeEventListener('click', capture, true)
+      delete row.dataset.statusBoardEntry
+      row.removeAttribute('aria-expanded')
+      row.removeAttribute('aria-controls')
+      row.removeAttribute('aria-label')
+      row.removeAttribute('title')
+      row.style.position = previousPosition
+      row.style.paddingRight = previousPaddingRight
+    }
+  }, [aria, collapsed, open, tree, treeId])
+
+  // Close the tree when the column collapses; the rail cannot show it.
+  useEffect(() => {
+    if (collapsed) tree.close()
+  }, [collapsed, tree])
+
+  // Insert one container after the row's nav child and portal the tree into it.
+  useEffect(() => {
+    if (collapsed) {
+      setContainer(null)
+      setFallback(null)
+      return undefined
+    }
+    const row = iconRef.current?.closest('button')
+    if (row === null || row === undefined) return undefined
+    const nav = row.closest('nav')
+    if (nav === null) {
+      // Degraded but usable: a fixed panel under the row. The real app's
+      // sidebar always renders a nav today; this branch keeps a future shell
+      // change from turning the tree into a no-op.
+      if (!warned.current) {
+        warned.current = true
+        console.warn('[dsh-plugin-status-board] sidebar nav not found; using the anchored tree fallback')
+      }
+      return undefined
+    }
+
+    const box = document.createElement('div')
+    box.className = 'status-board__tree-portal'
+    box.id = treeId
+    box.hidden = true
+    box.dataset.statusBoardTree = 'true'
+    const anchor = directChildOf(nav, row)
+    insertTree(nav, box, anchor)
+
+    // React does not own this node. If the shell reconciles the nav and drops
+    // it, put it back; if the whole row is gone, the component unmounts and the
+    // cleanup below removes the box.
+    const observer = new MutationObserver(() => {
+      if (!box.isConnected) insertTree(nav, box, anchor?.isConnected === true ? anchor : null)
+    })
+    observer.observe(nav, { childList: true })
+    setContainer(box)
+
+    return () => {
+      observer.disconnect()
+      box.remove()
+      setContainer(null)
+    }
+  }, [collapsed, treeId])
+
+  // Hiding the box (rather than unmounting it) keeps `aria-controls` resolving.
+  useEffect(() => {
+    if (container !== null) container.hidden = !open
+  }, [container, open])
+
+  // The fallback has no portal container to measure against. Measure when it
+  // actually opens, after layout, so a jsdom/zero-box first frame does not pin
+  // it to the window origin forever.
+  useEffect(() => {
+    if (collapsed || container !== null || !open) {
+      setFallback(null)
+      return
+    }
+    const row = iconRef.current?.closest('button')
+    if (row === null || row === undefined) return
+    if (row.closest('nav') !== null) return
+    const rect = row.getBoundingClientRect()
+    if (rect.width === 0) return
+    setFallback({ left: rect.left, top: rect.bottom + 4, width: rect.width })
+  }, [collapsed, container, open])
+
+  const onOpenSession = resolveNavigation()
+
+  return (
+    <>
+      <span ref={iconRef} className="status-board__nav-glyph" data-open={open}>
+        <BoardGlyph size={size} />
+        {collapsed ? null : (
+          <span className="status-board__nav-chevron" data-open={open} aria-hidden="true">
+            ▾
+          </span>
+        )}
+      </span>
+      {container !== null && !collapsed ? createPortal(<StatusTree store={store} onOpenSession={onOpenSession} />, container) : null}
+      {fallback !== null && open && !collapsed
+        ? createPortal(
+            <div
+              className="status-board__tree-fallback"
+              style={{ position: 'fixed', left: fallback.left, top: fallback.top, width: fallback.width }}
+            >
+              <StatusTree store={store} onOpenSession={onOpenSession} />
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  )
+}
+
+/**
+ * The floating board (entry ②).
+ *
+ * A compact button fixed to the bottom-right corner opens the board above it.
+ * The panel is a non-modal popover: Escape and an outside press close it,
+ * focus moves into it on open and returns to the button on close.
  */
 export function BoardOverlay({
   controller,
   store,
   resolveNavigation,
+  answerQuestion,
 }: {
   readonly controller: OverlayController
   readonly store: BoardStore
   readonly resolveNavigation: () => ((sessionId: string) => void) | undefined
+  readonly answerQuestion?: AnswerQuestion | undefined
 }): ReactElement | null {
   const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const fabRef = useRef<HTMLButtonElement | null>(null)
+  const wasOpen = useRef(false)
   const panelId = `status-board-overlay-${useId()}`
   const counts = countBoards(state)
+  const aria = describeCounts(translate, counts)
 
-  const close = useCallback(() => controller.close(), [controller])
-
-  // The nav row's measurements, so the readout badge and the panel can both sit
-  // against the row that owns them instead of at a fixed spot in the frame.
-  const [rowRect, setRowRect] = useState<{ right: number; top: number; height: number } | null>(null)
-  useEffect(() => {
-    let attempts = 0
-
-    const measure = (): boolean => {
-      const row = document.querySelector<HTMLElement>('[data-status-board-entry]')
-      if (row === null) return false
-      const rect = row.getBoundingClientRect()
-      // A row that exists but has not been laid out yet reports a zero box;
-      // anchoring to it would put the badge at the window origin for one frame.
-      if (rect.width === 0 || rect.height === 0) return false
-      setRowRect({ right: rect.right, top: rect.top, height: rect.height })
-      return true
-    }
-
-    // The row is marked by `BoardNavEntry`, whose effect can run after this one:
-    // the two are sibling slot registrations with no shared parent. So retry
-    // across frames instead of measuring once and silently giving up — that is
-    // exactly the bug that made the badge never appear in the real app.
-    // `requestAnimationFrame` is absent in a bare DOM, so fall back to a
-    // microtask-delayed retry rather than throwing.
-    const schedule = (callback: () => void): number | ReturnType<typeof setTimeout> => {
-      if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(callback)
-      return setTimeout(callback, 16)
-    }
-    const cancel = (handle: number | ReturnType<typeof setTimeout>): void => {
-      if (typeof handle === 'number' && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle)
-      else clearTimeout(handle as ReturnType<typeof setTimeout>)
-    }
-    let handle: number | ReturnType<typeof setTimeout> = 0
-    const tick = (): void => {
-      if (measure() || attempts >= 60) return
-      attempts += 1
-      handle = schedule(tick)
-    }
-    tick()
-
-    const onResize = (): void => {
-      measure()
-    }
-    window.addEventListener('resize', onResize)
-    return () => {
-      cancel(handle)
-      window.removeEventListener('resize', onResize)
-    }
-    // Re-measured when the board changes too: a count going from 3 to 12 changes
-    // the badge width, and the label can reflow the row above it.
-  }, [open, state.board])
-
-  // Escape closes from anywhere: the panel is not modal, so the key must work
+  // Escape closes from anywhere: the popover is not modal, so the key must work
   // even while focus sits inside the conversation behind it.
   useEffect(() => {
     if (!open) return undefined
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') close()
+      if (event.key === 'Escape') controller.close()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, close])
+  }, [controller, open])
 
   // An outside pointer press closes the board. `pointerdown` rather than `click`
   // so the panel is gone before the press lands on the content underneath.
@@ -278,130 +324,78 @@ export function BoardOverlay({
       const target = event.target
       if (!(target instanceof Node)) return
       if (panelRef.current?.contains(target) === true) return
-      // The entry owns its own toggle; treating its press as "outside" would
-      // close and immediately reopen the panel. Both forms are checked: the
-      // nav row (marked by `BoardNavEntry`) and the foot strip.
-      if (
-        target instanceof Element &&
-        (target.closest('.status-board__trigger') !== null ||
-          target.closest('.status-board__strip') !== null ||
-          target.closest('[data-status-board-entry]') !== null)
-      ) {
-        return
-      }
-      close()
+      if (fabRef.current?.contains(target) === true) return
+      controller.close()
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open, close])
+  }, [controller, open])
 
-  // Move focus into the panel on open so the disclosure is usable from the
-  // keyboard; the trigger restores it on close.
+  // Move focus into the panel on open, and back to the button on close. The
+  // `wasOpen` guard avoids stealing focus on the initial closed render.
   useEffect(() => {
-    if (open) panelRef.current?.focus()
-  }, [open])
-
-  // Anchor the panel beside the entry row. Measured on open (and on resize)
-  // because the row's position depends on the sidebar's own layout: the shipped
-  // nav rows above it, the fold state, and the window height all move it.
-  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null)
-  useEffect(() => {
-    if (!open) {
-      setAnchor(null)
-      return undefined
+    if (open) {
+      wasOpen.current = true
+      panelRef.current?.focus()
+      return
     }
-    const place = (): void => {
-      const row = document.querySelector<HTMLElement>('[data-status-board-entry]')
-      if (row === null) return
-      const rect = row.getBoundingClientRect()
-      // Open beside the sidebar, aligned to the row's top edge. Clamped so a
-      // short window cannot push the panel off the bottom.
-      const panelHeight = panelRef.current?.offsetHeight ?? 360
-      const maxTop = Math.max(8, window.innerHeight - panelHeight - 8)
-      setAnchor({ left: Math.max(8, rect.right + 6), top: Math.min(Math.max(8, rect.top), maxTop) })
+    if (wasOpen.current) {
+      wasOpen.current = false
+      fabRef.current?.focus()
     }
-    place()
-    window.addEventListener('resize', place)
-    return () => window.removeEventListener('resize', place)
   }, [open])
-
-  // The readout badge renders whether the panel is open or not: it is the whole
-  // point of the nav entry, which the framework draws as icon + plain text and
-  // therefore cannot carry three coloured counts of its own.
-  const badge =
-    rowRect === null ? null : (
-      <div
-        className="status-board__row-badge"
-        aria-hidden="true"
-        style={{ top: rowRect.top + rowRect.height / 2, right: `calc(100vw - ${rowRect.right}px + 10px)` }}
-      >
-        <span className="status-board__metric" data-metric="decision" data-empty={counts.decision === 0}>
-          <span className="status-board__metric-dot" />
-          {counts.decision}
-        </span>
-        <span className="status-board__metric" data-metric="executing" data-empty={counts.executing === 0}>
-          <span className="status-board__metric-dot" />
-          {counts.executing}
-        </span>
-        <span className="status-board__metric" data-metric="recent" data-empty={counts.recent === 0}>
-          <span className="status-board__metric-dot" />
-          {counts.recent}
-        </span>
-      </div>
-    )
-
-  // The badge is styled by the board's stylesheet, so that stylesheet has to be
-  // in the document whenever the badge is — not only while the panel is open.
-  // Rendering it only inside `BoardPanel` left a closed board's readout unstyled
-  // and therefore invisible, which is how the first cut shipped.
-  const styles = <style>{PANEL_CSS}</style>
-
-  if (!open) {
-    return (
-      <>
-        {styles}
-        {badge}
-      </>
-    )
-  }
 
   const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
 
   return (
-    <div className="status-board__overlay-root">
-      {badge}
-      <div
-        className="status-board__overlay"
-        id={panelId}
-        role="dialog"
-        aria-label={translate('panel.title')}
-        ref={panelRef}
-        tabIndex={-1}
-        // Anchored to the measured row; falls back to the layer's own padding
-        // before the first measurement lands (one frame).
-        style={anchor === null ? undefined : { position: 'fixed', left: anchor.left, top: anchor.top }}
+    <>
+      <style>{PANEL_CSS}</style>
+      <button
+        ref={fabRef}
+        type="button"
+        className="status-board__fab"
+        aria-label={aria}
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        title={aria}
+        onClick={() => controller.toggle()}
       >
-        <div className="status-board__overlay-bar">
-          <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
-          {/* The bare number, not "Sessions: 10": the bar is narrow and the
-              label already says what is being counted. */}
-          <span className="status-board__overlay-total" aria-label={translate('summary.total', { total })}>
-            {total}
+        <BoardGlyph size={18} />
+        {counts.decision > 0 ? (
+          <span className="status-board__fab-badge" aria-hidden="true">
+            {counts.decision}
           </span>
-          <button
-            type="button"
-            className="status-board__overlay-close"
-            aria-label={translate('action.close')}
-            title={translate('action.close')}
-            onClick={close}
-          >
-            ×
-          </button>
+        ) : null}
+      </button>
+      {open ? (
+        <div
+          className="status-board__overlay status-board__overlay--fab"
+          id={panelId}
+          role="dialog"
+          aria-label={translate('panel.title')}
+          ref={panelRef}
+          tabIndex={-1}
+        >
+          <div className="status-board__overlay-bar">
+            <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
+            <span className="status-board__overlay-total" aria-label={translate('summary.total', { total })}>
+              {total}
+            </span>
+            <button
+              type="button"
+              className="status-board__overlay-close"
+              aria-label={translate('action.close')}
+              title={translate('action.close')}
+              onClick={() => controller.close()}
+            >
+              ×
+            </button>
+          </div>
+          <div className="status-board__overlay-body">
+            <BoardPanel store={store} resolveNavigation={resolveNavigation} answerQuestion={answerQuestion} />
+          </div>
         </div>
-        <div className="status-board__overlay-body">
-          <BoardPanel store={store} resolveNavigation={resolveNavigation} />
-        </div>
-      </div>
-    </div>
+      ) : null}
+    </>
   )
 }

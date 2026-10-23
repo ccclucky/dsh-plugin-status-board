@@ -1,14 +1,17 @@
 /**
- * The board view — rendered INSIDE the left sidebar, as a module beside the
- * workspace list, not as a full main-column page.
+ * The board view — rendered inside the floating popover (entry ②), not as a
+ * full main-column page.
  *
  * Layout consequences of that destination:
- * - One column, not a responsive grid: the sidebar is ~280px wide, so a
+ * - One column, not a responsive grid: the floating panel is ~380px wide, so a
  *   multi-column grid would collapse anyway and only waste vertical rhythm.
  * - Compact rows: a state dot, one ellipsised title line, and the relative time.
  *   The workspace path moves to the tooltip.
  * - Boards are collapsible sections with a live count, so a collapsed board
  *   still states how much it hides.
+ * - Decision rows with a `userQuestions` payload get an inline answer card
+ *   (continued questions submit through the Remote; open questions point at the
+ *   session's own card).
  *
  * Design notes (Nielsen's heuristics where they bite):
  * - *Visibility of system status*: counts per board, and loading is distinct
@@ -27,6 +30,7 @@ import { BUCKET_IDS, type BucketId, type BoardEntry } from '../shared/types.ts'
 import { bucketToggleLabel, isCollapsed, totalRows } from '../shared/board.ts'
 import { createTranslate, formatRelativeTime, type MessageKey, type Translate } from '../shared/i18n.ts'
 import type { BoardState, BoardStore } from './store.ts'
+import { QuestionCard, type AnswerQuestion } from './QuestionCard.tsx'
 import { PANEL_CSS } from './styles.ts'
 
 /** The panel's props: the store it renders plus the navigation seam. */
@@ -41,6 +45,12 @@ export interface PanelProps {
    * affordance is decided.
    */
   readonly resolveNavigation?: (() => ((sessionId: string) => void) | undefined) | undefined
+  /**
+   * Submit one continued question batch. `undefined` keeps the card read-only
+   * and directs the user to the session, which is the correct fallback when the
+   * composition does not expose the user-questions Remote namespace.
+   */
+  readonly answerQuestion?: AnswerQuestion | undefined
 }
 
 /**
@@ -66,7 +76,7 @@ const CLOCK_INTERVAL_MS = 30_000
  * The store only republishes when session data changes, so a sidebar left open
  * on an idle page would otherwise keep saying "just now" for an hour.
  */
-function useRelativeClock(): number {
+export function useRelativeClock(): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), CLOCK_INTERVAL_MS)
@@ -78,7 +88,7 @@ function useRelativeClock(): number {
 }
 
 /** The chevron drawn by the toggle; pure markup, no icon dependency. */
-function Chevron({ collapsed }: { readonly collapsed: boolean }): ReactElement {
+export function Chevron({ collapsed }: { readonly collapsed: boolean }): ReactElement {
   const style: CSSProperties = { width: 10, height: 10, display: 'block' }
   return (
     <svg
@@ -121,18 +131,24 @@ export function Row({
   translate,
   now,
   onOpen,
+  answerQuestion,
 }: {
   readonly entry: BoardEntry
   readonly bucket: BucketId
   readonly translate: Translate
   readonly now: number
   readonly onOpen: ((sessionId: string) => void) | undefined
+  readonly answerQuestion?: AnswerQuestion | undefined
 }): ReactElement {
   const meta = formatRelativeTime(now, entry.lastActivityAt, translate)
-  // The workspace path would cost a third column in a 280px sidebar; the native
+  // The workspace path would cost a third column in the compact row; the native
   // tooltip carries it instead.
   const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
   const metaId = `status-board-meta-${entry.id}`
+  const cardId = `status-board-question-${useId()}`
+  // Hooks run for every row (including rows without questions) so the component
+  // never changes its hook order between two publications.
+  const [expanded, setExpanded] = useState(false)
   const content = [
     <span className="status-board__dot" data-state={bucket} aria-hidden="true" key="dot" />,
     <span className="status-board__row-title" key="title">
@@ -142,18 +158,16 @@ export function Row({
       {meta}
     </span>,
   ]
+  const hasQuestions = entry.questions !== undefined && entry.questions.length > 0
 
   // A row is interactive only when the profile exposes a way to open sessions;
   // otherwise it renders as static text so the affordance never lies.
-  if (onOpen === undefined) {
-    return (
-      <li className="status-board__row" data-state={bucket} title={tooltip}>
+  const row =
+    onOpen === undefined ? (
+      <div className="status-board__row" data-state={bucket} title={tooltip}>
         {content}
-      </li>
-    )
-  }
-  return (
-    <li>
+      </div>
+    ) : (
       <button
         type="button"
         className="status-board__row"
@@ -167,6 +181,36 @@ export function Row({
       >
         {content}
       </button>
+    )
+
+  if (!hasQuestions) {
+    return <li>{row}</li>
+  }
+
+  return (
+    <li className="status-board__row-item" data-state={bucket}>
+      <div className="status-board__row-line">
+        {row}
+        <button
+          type="button"
+          className="status-board__answer-toggle"
+          aria-expanded={expanded}
+          aria-controls={cardId}
+          aria-label={`${translate('action.answer')}: ${entry.title}`}
+          title={translate('action.answer')}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {translate('action.answer')}
+        </button>
+      </div>
+      <div id={cardId} className="status-board__qcard-host" hidden={!expanded}>
+        <QuestionCard
+          entry={entry}
+          translate={translate}
+          onOpenSession={onOpen}
+          answerQuestion={answerQuestion}
+        />
+      </div>
     </li>
   )
 }
@@ -180,6 +224,7 @@ function Bucket({
   now,
   query,
   onOpenSession,
+  answerQuestion,
 }: {
   readonly id: BucketId
   readonly state: BoardState
@@ -188,6 +233,7 @@ function Bucket({
   readonly now: number
   readonly query: string
   readonly onOpenSession: ((sessionId: string) => void) | undefined
+  readonly answerQuestion: AnswerQuestion | undefined
 }): ReactElement | null {
   const board = state.board.buckets.find(candidate => candidate.id === id)
   if (board === undefined) return null
@@ -267,6 +313,7 @@ function Bucket({
                 translate={translate}
                 now={now}
                 onOpen={onOpenSession}
+                answerQuestion={answerQuestion}
               />
             ))}
           </ul>
@@ -284,18 +331,20 @@ function Bucket({
  *
  * @param props - the store plus the navigation seam.
  */
-export function BoardPanel({ store, resolveNavigation }: PanelProps): ReactElement {
+export function BoardPanel({ store, resolveNavigation, answerQuestion }: PanelProps): ReactElement {
   const onOpenSession = resolveNavigation?.()
-  return <BoardPanelBody store={store} onOpenSession={onOpenSession} />
+  return <BoardPanelBody store={store} onOpenSession={onOpenSession} answerQuestion={answerQuestion} />
 }
 
 /** The subscribed body. */
 function BoardPanelBody({
   store,
   onOpenSession,
+  answerQuestion,
 }: {
   readonly store: BoardStore
   readonly onOpenSession: ((sessionId: string) => void) | undefined
+  readonly answerQuestion: AnswerQuestion | undefined
 }): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
@@ -360,6 +409,7 @@ function BoardPanelBody({
             now={now}
             query={query}
             onOpenSession={onOpenSession}
+            answerQuestion={answerQuestion}
           />
         ))}
       </div>

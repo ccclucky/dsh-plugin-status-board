@@ -1,16 +1,20 @@
 /**
  * Client half of dsh-plugin-status-board.
  *
- * It contributes three things to the Harness Web UI:
+ * It contributes two entry surfaces to the Harness Web UI:
  *
- * 1. A **sidebar panel icon** in `sidebar.panellist` — the shipped seat for
- *    global panel icons. A list registration's `id` is what the main column
- *    dispatches on, so the icon and the panel share one id.
- * 2. The **panel body** in `main`, keyed by that same id. The main slot binds no
- *    Session to a non-`conversation` key, which is exactly right: the board is
- *    cross-session by design.
- * 3. The **locale dictionaries**, registered through the locale service so the
- *    Harness language switch and the panel copy move together.
+ * 1. A **sidebar row** in `sidebar.panellist`. Clicking it expands a real,
+ *    inline navigation tree under the row (3 status folders, then sessions).
+ *    The row's framework click is captured so it does not select a main column;
+ *    the tree is portaled into the sidebar's `nav` because the slot gives the
+ *    plugin only the row's icon cell.
+ * 2. A **floating button** in `shell.overlay`. Clicking it opens the current
+ *    board as a popover: filter, 3 boards, and — when the composition exposes
+ *    the user-questions Remote — an inline L2 question card for continued
+ *    questions.
+ *
+ * Both surfaces share one store. The tree is navigation only; approval and
+ * answer controls stay in the floating board (entry ②) or the session itself.
  *
  * Data comes from the Harness's own session list (`ctx.sessions.list`): the
  * framework already publishes it, so this half subscribes instead of polling.
@@ -29,6 +33,8 @@
 import { createElement, type ReactElement } from 'react'
 import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
 import { createOverlayController, BoardNavEntry, BoardOverlay } from './overlay.tsx'
+import type { AnswerQuestion } from './QuestionCard.tsx'
+import type { AnswerBatch } from '../shared/types.ts'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
 import type { SessionListLike } from './session-source.ts'
 import enFile from '../../locale/en.json'
@@ -162,30 +168,63 @@ export function apply(ctx: ClientContext): void {
   }
 
   // ── Slots ─────────────────────────────────────────────────────────────────
-  // Shape A: the entry is a row in the sidebar nav list, directly under the
-  // shipped rows, and the board opens as a frame-wide floating panel.
+  // Two independent entry surfaces:
   //
-  // The nav row's button belongs to the framework, which normally makes a click
-  // select a main column. `BoardNavEntry` captures that click on the row before
-  // the shell sees it, so the row opens the board instead of navigating — and no
-  // main-column registration is needed.
-  //
-  // `sidebar.workspaces` is deliberately NOT used: its catalog says "declaring
-  // is claiming" and the shipped `sidebar` entry claims it for the workspace
-  // browser, so a module cannot be inserted there — and shadowing it would
-  // delete the workspace list, its search box, and the new-session control.
-  const controller = createOverlayController()
+  // 1. `sidebar.panellist`: the framework row. Its click is captured to toggle
+  //    the inline tree (portaled under the row) instead of selecting a main
+  //    column. The tree is navigation only.
+  // 2. `shell.overlay`: a compact floating button that opens the current board
+  //    as a popover. The board and the tree share the store, never the open
+  //    state.
+  const treeController = createOverlayController()
+  const boardController = createOverlayController()
 
   const NavEntry = ({ size }: { size: number }): ReactElement =>
-    createElement(BoardNavEntry, { controller, store, size })
+    createElement(BoardNavEntry, { tree: treeController, store, size, resolveNavigation })
 
-  // The counts are drawn by `BoardOverlay` as a badge pinned to this row's right
-// edge: the framework renders the label as plain text, so a coloured readout
-// cannot live inside it.
+  // The counts are drawn inside the tree and as the floating button's badge;
+  // the framework's nav label stays plain text.
   const navLabel = (): string => createTranslate(store.getSnapshot().locale)('panel.title')
 
+  /**
+   * Resolve the Host answer RPC lazily.
+   *
+   * `remote.userQuestions` is a capability of the composed profile; treating it
+   * as a hard inject would make the whole plugin fail to activate on a profile
+   * that disabled the user-questions plugin. Without it the card stays
+   * read-only and the row offers "open session" instead.
+   */
+  const resolveAnswer = (): AnswerQuestion | undefined => {
+    const remote = ctx.get('remote') as
+      | {
+          readonly userQuestions?: {
+            readonly answer?: (
+              sessionId: string,
+              callId: string,
+              answer: AnswerBatch,
+            ) => Promise<{ readonly ok: true; readonly value: boolean } | { readonly ok: false; readonly error: { readonly message: string } }>
+          }
+        }
+      | undefined
+    const api = remote?.userQuestions
+    if (api === undefined || typeof api.answer !== 'function') return undefined
+    // Keep the namespace as the receiver: Remote methods are generated on the
+    // namespace object and may rely on `this`.
+    const answer = api.answer.bind(api)
+    return async (sessionId, callId, batch) => {
+      const result = await answer(sessionId, callId, batch)
+      if (!result.ok) throw new Error(result.error.message)
+      if (!result.value) throw new Error('the question is no longer answerable')
+    }
+  }
+
   const Overlay = (): ReactElement | null =>
-    createElement(BoardOverlay, { controller, store, resolveNavigation })
+    createElement(BoardOverlay, {
+      controller: boardController,
+      store,
+      resolveNavigation,
+      answerQuestion: resolveAnswer(),
+    })
 
   ctx.slots.inject('sidebar.panellist', () =>
     ctx.slots.register({ name: 'sidebar.panellist', id: 'status-board', order: 20, label: navLabel }, NavEntry),

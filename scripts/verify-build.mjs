@@ -70,6 +70,12 @@ const table = {
     if (specifier === 'react/jsx-runtime') {
       return { jsx: () => ({}), jsxs: () => ({}), Fragment: 'fragment' }
     }
+    if (specifier === 'react-dom') {
+      return { createPortal: () => ({}) }
+    }
+    if (specifier === 'react-dom/client') {
+      return { createRoot: () => ({ render: () => {}, unmount: () => {} }) }
+    }
     throw new Error(`unexpected module: ${specifier}`)
   },
 }

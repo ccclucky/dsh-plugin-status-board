@@ -364,6 +364,7 @@ button.status-board__row:active {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   color: inherit;
   line-height: 0;
 }
@@ -374,77 +375,7 @@ button.status-board__row:active {
   color: var(--dsw-alias-state-business-primary);
 }
 
-/* ── Nav-row readout badge ───────────────────────────────────────────────── */
-
-/* Pinned to the right of the nav row. The row itself belongs to the framework
-   and can only carry icon + plain text, so this is how the three counts stay
-   colour-coded the way the design calls for. It is not interactive: presses
-   fall through to the row underneath, which owns the toggle. */
-.status-board__row-badge {
-  position: fixed;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-/* The three counts, pinned to the right of the nav row. Colour lives on the dot
-   alone: the number keeps the row's own text colour, so the group reads as one
-   instrument instead of three competing warnings. The dot colours are the same
-   three accents the boards use, so a count in the rail and its board agree. */
-.status-board__metric {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.status-board__metric-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--dsw-alias-label-tertiary);
-}
-
-.status-board__metric[data-metric="decision"] .status-board__metric-dot {
-  background: var(--dsw-alias-state-warn-label);
-}
-
-.status-board__metric[data-metric="executing"] .status-board__metric-dot {
-  background: var(--dsw-alias-state-business-primary);
-}
-
-.status-board__metric[data-metric="recent"] .status-board__metric-dot {
-  background: var(--dsw-alias-label-tertiary);
-}
-
-/* A zero is dimmed rather than hidden: it still says the board is empty. */
-.status-board__metric[data-empty="true"] {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.status-board__metric[data-empty="true"] .status-board__metric-dot {
-  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 45%, transparent);
-}
-
 /* ── Floating board ──────────────────────────────────────────────────────── */
-
-/* The layer spans the frame and is click-through; the panel inside it is
-   positioned from the measured entry row (see BoardOverlay), so this container
-   only supplies the pointer-events root and a corner fallback. */
-.status-board__overlay-root {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 0;
-  pointer-events: none;
-}
 
 .status-board__overlay {
   display: flex;
@@ -543,5 +474,579 @@ button.status-board__row:active {
 .status-board__overlay-body .status-board {
   height: auto;
   background: transparent;
+}
+
+/* ── Nav chevron ─────────────────────────────────────────────────────────── */
+
+.status-board__nav-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 8px;
+  line-height: 1;
+  transform: translateY(-50%);
+  transition: transform 120ms ease, color 120ms ease;
+}
+
+.status-board__nav-chevron[data-open="true"] {
+  color: var(--dsw-alias-state-business-primary);
+  transform: translateY(-50%) rotate(90deg);
+}
+
+/* ── Inline tree (entry ①) ───────────────────────────────────────────────── */
+
+/* The portal container is inserted after the framework nav row inside
+   nav.panelList. It is a normal flex child there, so the tree pushes the
+   Workspace browser down instead of floating over it. */
+.status-board__tree-portal {
+  display: block;
+  flex: none;
+  margin: 0 2px 4px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.status-board__tree-portal[hidden] {
+  display: none;
+}
+
+.status-board-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 8px;
+  padding: 2px 0 4px 9px;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+}
+
+.status-board-tree__folder {
+  --sb-tree-accent: var(--dsw-alias-label-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.status-board-tree__folder[data-bucket="decision"] {
+  --sb-tree-accent: var(--dsw-alias-state-warn-label);
+}
+
+.status-board-tree__folder[data-bucket="executing"] {
+  --sb-tree-accent: var(--dsw-alias-state-business-primary);
+}
+
+.status-board-tree__heading {
+  margin: 0;
+  font: inherit;
+  font-weight: inherit;
+}
+
+.status-board-tree__toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.status-board-tree__toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.status-board-tree__toggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+.status-board-tree__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sb-tree-accent);
+}
+
+.status-board-tree__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board-tree__count {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-board-tree__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0 0 2px 14px;
+  list-style: none;
+}
+
+.status-board-tree__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-align: left;
+}
+
+button.status-board-tree__row {
+  cursor: pointer;
+}
+
+button.status-board-tree__row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.status-board-tree__row:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+.status-board-tree__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0;
+}
+
+.status-board-tree__title {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-board-tree__time {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.status-board-tree__empty {
+  margin: 0;
+  padding: 2px 5px 4px 19px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.status-board-tree__truncated {
+  margin: 0;
+  padding: 1px 5px 3px 19px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+}
+
+.status-board-tree__alert {
+  margin: 2px 4px 4px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+}
+
+/* Degraded placement used only when the shell no longer exposes a nav to
+   portal into. It is still the same tree, just anchored under the row. */
+.status-board__tree-fallback {
+  z-index: 60;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
+  pointer-events: auto;
+}
+
+/* ── Decision row answer toggle ──────────────────────────────────────────── */
+
+.status-board__row-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-board__row-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.status-board__row-line > .status-board__row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.status-board__answer-toggle {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-state-business-primary);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.status-board__answer-toggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.status-board__answer-toggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+.status-board__qcard-host {
+  padding: 2px 0 4px 16px;
+}
+
+/* ── Question card (L2) ──────────────────────────────────────────────────── */
+
+.status-board__qcard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.status-board__qcall {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.status-board__qcall + .status-board__qcall {
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.status-board__q {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.status-board__q-title {
+  padding: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.status-board__q-text {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.status-board__q-detail {
+  margin-top: 5px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.status-board__q-detail summary {
+  cursor: pointer;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.status-board__q-detail p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.status-board__q-options {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.status-board__q-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.status-board__q-option:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.status-board__q-option[data-selected="true"] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, var(--dsw-alias-bg-layer-1));
+}
+
+.status-board__q-option:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.status-board__q-option:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+.status-board__q-option-label {
+  font-weight: 600;
+}
+
+.status-board__q-option-desc {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.status-board__q-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.status-board__q-custom-label {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+}
+
+.status-board__q-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 5px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.status-board__q-input:focus-visible {
+  border-color: var(--dsw-alias-state-business-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+}
+
+.status-board__q-hint {
+  margin: 5px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+}
+
+.status-board__q-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.status-board__q-submit {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-board__q-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.status-board__q-submit:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.status-board__q-open {
+  padding: 5px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.status-board__q-open:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.status-board__q-open:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.status-board__q-note {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.status-board__q-error {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.status-board__q-sent {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+/* ── Floating entry button (entry ②) ─────────────────────────────────────── */
+
+.status-board__fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 62;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow:
+    0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.status-board__fab:hover {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.status-board__fab:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.status-board__fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 2px solid var(--dsw-alias-bg-layer-1);
+  border-radius: 999px;
+  background: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-board__overlay--fab {
+  position: fixed;
+  right: 16px;
+  bottom: 64px;
+  z-index: 61;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+}
+
+@media (max-width: 900px) {
+  /* Narrow windows let the composer reach the frame edge. Lift the button
+     above it rather than covering the send control. */
+  .status-board__fab {
+    bottom: 96px;
+  }
+
+  .status-board__overlay--fab {
+    bottom: 144px;
+  }
+}
+
+@media (max-width: 720px) {
+  .status-board__fab {
+    right: 12px;
+    bottom: 88px;
+  }
+
+  .status-board__overlay--fab {
+    right: 12px;
+    bottom: 136px;
+    max-height: min(62vh, 520px);
+  }
 }
 `
