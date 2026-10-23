@@ -64,6 +64,40 @@ an inline navigation tree, and a compact floating button opens the full board.
 - Question changes now participate in the store's structural comparison, so a
   changed option list re-renders the card instead of showing stale labels.
 
+### 中文发布说明
+
+会话状态看板 **0.3.0**：两个入口，各司其职。
+
+#### 两个入口
+- **侧栏目录树**：点击「会话状态看板」行向下展开 3 个状态目录，像 3 个项目分组；点会话行直接打开会话，树里不放批准/回答按钮。
+- **右下角悬浮胶囊**：点击打开完整看板，标题栏显示会话总数；保留筛选与三块状态。
+
+#### 状态标记
+- **目录静态**：待决策实心琥珀点、进行中蓝色弧线 + 实心核、近期灰点。
+- **会话行动态**：待决策空心琥珀环缓慢呼吸；进行中蓝色弧线脉冲（不持续旋转）；近期记录静止。
+- **空目录**不播放动画；`prefers-reduced-motion` 下所有动效自动关闭。
+
+#### 浮窗题卡
+- 决策行可展开题卡：`continued` 题通过 `remote.userQuestions.answer` 就地提交；`open` 题跳转到会话里的官方题卡。
+- 支持选项、自定义回答、多选、提交/已提交/错误态；没有回答通道时卡片只读并引导打开会话。
+
+#### 近期记录
+- 默认窗口改为 **7 天（168 小时）**，提示显示「最近 7 天」而不是 168 小时。
+- 仍受 `maxRecent`（默认 20）上限，超出部分会提示；需要更多可在配置中调大。
+
+#### 修复与视觉
+- 修复 `remote.userQuestions` 未注入导致浮层崩溃、侧栏树退化为浏览器默认按钮的问题。
+- 轻底色树面板、单行会话、双行看板标题、按状态区分空文案、暖色题卡与选项圆点。
+- 侧栏树自带样式，浮层异常不再影响导航样式。
+
+安装/升级：
+
+```bash
+dsh plugin --profile <profile> add dsh-plugin-status-board@0.3.0
+```
+
+或在 Plugin Manager 中安装 `0.3.0`。
+
 ## [0.2.2] — 2026-10-23
 
 No change to the shipped code: every byte of the plugin is identical to 0.2.1.
