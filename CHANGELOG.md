@@ -41,8 +41,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   closed on `pointerdown` and the ensuing click reopened it. The panel is now
   dismissed only when the gesture crosses the drag threshold, which is also the
   point where a press stops being a click.
-- The panel's height is measured before it is placed. A fixed estimate left the
-  panel floating far from the entry whenever the board was shorter than the guess.
+- The panel's height is measured before it is placed, and observed via a
+  `ResizeObserver` so dynamic size changes (such as expanding question cards or
+  toggling buckets) recalculate placement and prevent the panel from overflowing
+  below the viewport.
 
 ## [0.3.0] — 2026-10-24
 

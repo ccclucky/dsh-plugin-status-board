@@ -416,7 +416,9 @@ export function BoardOverlay({
 
   // ── Panel placement ────────────────────────────────────────────────────────
   // Measured, not assumed: a fixed guess leaves the panel floating away from the
-  // entry whenever the board is shorter than the guess.
+  // entry whenever the board is shorter than the guess. A ResizeObserver tracks
+  // content size changes (e.g. accordion/card toggles) so the panel flips or nudges
+  // rather than overflowing below the viewport.
   const [placement, setPlacement] = useState<{ left: number; top: number } | undefined>(undefined)
   useLayoutEffect(() => {
     if (!open) {
@@ -425,16 +427,33 @@ export function BoardOverlay({
     }
     const panel = panelRef.current
     if (panel === null) return
-    const box = fabBox()
-    const rect = panel.getBoundingClientRect()
-    const next = resolvePanelPlacement(
-      { left: box.left, top: box.top, width: box.width, height: box.height },
-      { width: rect.width, height: rect.height },
-      { width: globalThis.innerWidth, height: globalThis.innerHeight },
-      FAB_PANEL_GAP,
-      PANEL_EDGE_MARGIN,
-    )
-    setPlacement({ left: next.left, top: next.top })
+
+    const updatePlacement = (): void => {
+      const box = fabBox()
+      const rect = panel.getBoundingClientRect()
+      const next = resolvePanelPlacement(
+        { left: box.left, top: box.top, width: box.width, height: box.height },
+        { width: rect.width, height: rect.height },
+        viewport,
+        FAB_PANEL_GAP,
+        PANEL_EDGE_MARGIN,
+      )
+      setPlacement(prev =>
+        prev !== undefined && prev.left === next.left && prev.top === next.top
+          ? prev
+          : { left: next.left, top: next.top },
+      )
+    }
+
+    updatePlacement()
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        updatePlacement()
+      })
+      observer.observe(panel)
+      return () => observer.disconnect()
+    }
   }, [open, position, viewport, fabBox])
 
   // What to draw: the remembered position clamped into the viewport. Storage keeps
