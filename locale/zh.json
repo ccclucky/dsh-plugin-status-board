@@ -49,6 +49,7 @@
     "refresh": "刷新看板",
     "filter": "筛选会话",
     "close": "收起看板",
+    "resetPosition": "重置位置",
     "answer": "回答"
   },
   "detail": {

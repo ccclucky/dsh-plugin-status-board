@@ -77,6 +77,7 @@ function memoryStorage(): CollapseStorage & { data: Map<string, string> } {
     data,
     getItem: key => data.get(key) ?? null,
     setItem: (key, value) => void data.set(key, value),
+    removeItem: key => void data.delete(key),
   }
 }
 

@@ -4,6 +4,46 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **The floating entry can be dragged.** The panel no longer sits in a fixed
+  corner: it is placed from the entry's rectangle, so moving the entry takes the
+  panel with it. The position is remembered across reloads. Dragging into the upper
+  half flips the panel to open downward, and the entry is clamped into the viewport
+  rather than being allowed to leave it.
+- **Reset control** in the panel bar, next to the close button, disabled until the
+  entry has actually been moved. It deletes the stored key rather than writing the
+  default coordinates — a stored default is indistinguishable from a placement the
+  user chose, which would leave the control permanently enabled.
+- **Arrow-key nudging** (8px, doubled with Shift). Dragging is pointer-only, so
+  without this a keyboard user would have no way at all to adjust the position.
+- `GLOSSARY.md` and `docs/adr/0001` recording the vocabulary and the decision to
+  keep the position in `localStorage` rather than in the plugin config.
+
+### Changed
+
+- **The entry now shows three status markers** instead of an icon, a text label and
+  a single badge. They are the shared `StatusMark` component in the directory
+  variant — the same component and shape language the sidebar tree uses before each
+  section — each followed by its own tally. This makes the entry narrower (144px →
+  129px), reports all three boards instead of just the decision count, and keeps a
+  zero visible but dimmed so "nothing is waiting on me" is still readable. Narrow
+  viewports keep the markers and drop the numbers.
+- The reset glyph is an inline SVG (return-to-corner arrow) rather than a font
+  character: a text symbol renders differently per platform and the usual candidates
+  read as "expand" or "undo" instead of "put it back".
+
+### Fixed
+
+- Clicking the entry while the panel was open could not dismiss it: the panel was
+  closed on `pointerdown` and the ensuing click reopened it. The panel is now
+  dismissed only when the gesture crosses the drag threshold, which is also the
+  point where a press stops being a click.
+- The panel's height is measured before it is placed. A fixed estimate left the
+  panel floating far from the entry whenever the board was shorter than the guess.
+
 ## [0.3.0] — 2026-10-24
 
 The board now has **two entry surfaces**, split by job: the sidebar row expands

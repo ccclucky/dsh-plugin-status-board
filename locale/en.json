@@ -49,6 +49,7 @@
     "refresh": "Refresh board",
     "filter": "Filter sessions",
     "close": "Hide board",
+    "resetPosition": "Reset position",
     "answer": "Answer"
   },
   "detail": {
