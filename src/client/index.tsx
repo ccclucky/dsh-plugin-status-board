@@ -235,6 +235,9 @@ export function apply(ctx: ClientContext): void {
       store,
       resolveNavigation,
       answerQuestion: resolveAnswer(),
+      // The entry's position is a device preference, so it persists beside the
+      // collapse state rather than in the plugin config (see docs/adr/0001).
+      ...(storage !== undefined ? { positionStorage: storage } : {}),
     })
 
   ctx.slots.inject('sidebar.panellist', () =>

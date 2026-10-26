@@ -1091,6 +1091,9 @@ button.status-board-tree__row:hover {
 
 /* ── Floating entry button (entry ②) ─────────────────────────────────────── */
 
+/* The entry. Its position comes from the plugin once the user has moved it
+   (inline left/top) and from this corner otherwise, so the narrow-screen overrides
+   below still matter for someone who never drags anything. */
 .status-board__fab {
   position: fixed;
   right: 16px;
@@ -1099,11 +1102,11 @@ button.status-board-tree__row:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 10px;
   box-sizing: border-box;
   min-width: 38px;
   height: 34px;
-  padding: 0 12px 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
   background: var(--dsw-alias-bg-layer-1);
@@ -1114,13 +1117,12 @@ button.status-board-tree__row:hover {
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
     0 8px 20px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
-  cursor: pointer;
+  cursor: grab;
   pointer-events: auto;
-}
-
-.status-board__fab-label {
-  display: inline;
-  white-space: nowrap;
+  /* The button owns the gesture: without this a touch drag scrolls the
+     conversation behind it instead of moving the entry. */
+  touch-action: none;
+  user-select: none;
 }
 
 .status-board__fab:hover {
@@ -1132,28 +1134,89 @@ button.status-board-tree__row:hover {
   outline-offset: 2px;
 }
 
-.status-board__fab-badge {
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--dsw-alias-state-warn-primary);
-  color: var(--dsw-alias-label-primary-foreground);
-  font-size: 10px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+/* Dragging: the pointer stays over the button for the whole gesture, so a hover
+   repaint would flicker; the lifted shadow is what makes the move read as real. */
+.status-board__fab--dragging {
+  cursor: grabbing;
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
 }
 
+.status-board__fab--dragging:hover {
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+/* One board marker plus its tally. The marker is the shared StatusMark in its
+   directory variant - the same component the tree puts before each section - so
+   the entry cannot drift away from the tree's shape language. */
+.status-board__fab-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.status-board__fab-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* A zero keeps its place but recedes, matching the dimmed marker beside it. */
+.status-board__fab-count[data-empty="true"] {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The panel carries no anchor of its own: the plugin places it from the entry's
+   rectangle on every open and on every move, which is what keeps the two together.
+   Only its size stays here. */
 .status-board__overlay--fab {
   position: fixed;
-  right: 16px;
-  bottom: 60px;
   z-index: 61;
   width: min(382px, calc(100vw - 24px));
   max-height: min(70vh, 560px);
+}
+
+/* Sits left of the close button and matches its footprint. */
+.status-board__overlay-reset {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.status-board__overlay-reset svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.status-board__overlay-reset:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__overlay-reset:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+/* Present but unavailable. 0.42 rather than the usual 0.3: at 0.3 the glyph
+   composites to about 1.3:1 against the bar and reads as "nothing here" instead of
+   "present but unavailable". WCAG exempts disabled controls from the contrast
+   minimum, so this is about affordance, not compliance. */
+.status-board__overlay-reset:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {
@@ -1172,24 +1235,18 @@ button.status-board-tree__row:hover {
   .status-board__fab {
     right: 12px;
     bottom: 88px;
-    width: 38px;
-    padding: 0;
+    gap: 7px;
+    padding: 0 9px;
   }
 
-  .status-board__fab-label {
+  /* On a narrow viewport the tallies go and the markers stay: the numbers are the
+     precision, the markers are "which boards have anything in them", and a glance
+     wants the second. */
+  .status-board__fab-count {
     display: none;
   }
 
-  .status-board__fab-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    border: 2px solid var(--dsw-alias-bg-layer-1);
-  }
-
   .status-board__overlay--fab {
-    right: 12px;
-    bottom: 136px;
     max-height: min(62vh, 520px);
   }
 }

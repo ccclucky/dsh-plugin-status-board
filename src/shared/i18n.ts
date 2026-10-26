@@ -88,6 +88,8 @@ export interface LocaleFile {
     readonly filter: string
     /** Accessible label of the floating board's close control. */
     readonly close: string
+      /** Puts the floating entry back in its default corner. */
+      readonly resetPosition: string
     /** Toggle that reveals a decision row's question card. */
     readonly answer: string
   }

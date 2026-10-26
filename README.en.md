@@ -52,6 +52,14 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 - **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right pill opens the **full board**.
 - **The sidebar tree is navigation only** — click a session exactly like the Workspace browser; no approval or answer controls live in the tree.
 - **Status marks carry state, not just colour** — directories are static (a filled amber dot, a blue arc, a grey dot); session rows move only when it matters (a hollow amber ring breathes for decisions, a blue arc pulses for work in flight, history stays still). Nothing rotates; motion switches off under reduced-motion.
+- **A draggable floating entry**: move it anywhere and the board follows, because the panel derives its
+  placement from the entry rather than from a fixed corner. The position is remembered; shrinking the
+  window or unplugging a monitor only pulls it back into view temporarily. In the upper half of the
+  viewport the panel flips to open downward.
+- **Three status markers on the entry**, drawn with the same component and shape language as the sidebar
+  tree (amber dot in a halo for a decision, blue open arc for work in flight, grey dot for recent), each
+  followed by its count and dimmed when the count is zero. Narrow viewports keep the markers, drop the
+  numbers.
 - **Inline question card in the floating board** — decision rows expand; `continued` questions submit in place, while `open` questions point at the session's own card.
 - **Three collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
 - **Correct precedence** — a session waiting on your decision lands on the decision board even while its agent is still running; it never drowns in "Running".
@@ -193,7 +201,9 @@ dsh-plugin-status-board/
 │   │   └── types.ts             #   shared type contract
 │   └── client/
 │       ├── index.tsx            # slot registration (sidebar row + floating button + dicts)
-│       ├── overlay.tsx          # row capture + inline tree portal + floating button/board
+│       ├── overlay.tsx          # row capture + inline tree portal + floating entry/board
+│       ├── fab-geometry.ts      # entry position record, clamping and panel placement (pure)
+│       ├── fab-drag.ts          # drag gesture state machine (threshold, capture, click suppression)
 │       ├── Tree.tsx             # the 3 status folders + session rows (navigation only)
 │       ├── Panel.tsx            # floating board + decision-row card entry
 │       ├── QuestionCard.tsx     # L2 card (continued submits / open jumps)
@@ -217,7 +227,8 @@ dsh-plugin-status-board/
 | `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, question-payload narrowing, malformed rows |
 | `store.test.ts` | subscriptions, change detection, collapse persistence, late config must not clobber a click |
 | `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens, card expand/submit |
-| `overlay.test.tsx` | floating-button open/close, Escape and outside-press dismissal, focus in/out, decision badge, controller semantics |
+| `fab-geometry.test.ts` | position parsing and tolerance, viewport clamping (including a window smaller than the entry), half-screen panel flip and edge avoidance, reset as key deletion rather than writing defaults |
+| `overlay.test.tsx` | floating-entry open/close, Escape and outside-press dismissal, focus in/out, drag-versus-click boundary, position persistence and reset, arrow-key nudging, decision badge, controller semantics |
 | `nav-entry.test.tsx` | row click capture, inline tree portal, navigation-only rows, 56px rail hiding, no-nav fallback, cleanup |
 | `host.test.ts` | GET/HEAD/405 handling, Allow header, effect cleanup, late-mounting webServer |
 | `manifest.test.ts` | manifest / patch / locale / icon / MIT LICENSE consistency |

@@ -22,10 +22,18 @@ import { pickLocale, type LocaleId } from '../shared/i18n.ts'
 import { BUCKET_IDS, type BoardSnapshot, type BucketId, type CollapseState, type ResolvedStatusBoardConfig, type StatusBoardConfig } from '../shared/types.ts'
 import { collectSessionSignals, type SessionsFace, type SessionListLike } from './session-source.ts'
 
-/** The minimal storage face the store needs (browser `localStorage` subset). */
+/**
+ * The minimal storage face the store needs (browser `localStorage` subset).
+ *
+ * `removeItem` is part of it because forgetting a preference means deleting its
+ * key, not writing back a default: a stored default is indistinguishable from a
+ * choice the user made, so the control that offers the reset could never disable
+ * itself again.
+ */
 export interface CollapseStorage {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  removeItem(key: string): void
 }
 
 /** Locale service face (mirrored structurally). */

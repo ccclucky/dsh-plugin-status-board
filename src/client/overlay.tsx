@@ -14,8 +14,11 @@
  */
 
 import {
+  useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -26,8 +29,23 @@ import { createTranslate } from '../shared/i18n.ts'
 import type { BoardState, BoardStore } from './store.ts'
 import { BoardGlyph, BoardPanel, Chevron } from './Panel.tsx'
 import { StatusTree } from './Tree.tsx'
+import { StatusMark } from './StatusMark.tsx'
 import type { AnswerQuestion } from './QuestionCard.tsx'
 import { PANEL_CSS } from './styles.ts'
+import {
+  FAB_EDGE_MARGIN,
+  FAB_PANEL_GAP,
+  PANEL_EDGE_MARGIN,
+  clampFabPosition,
+  clearStoredFabPosition,
+  nudgeFabPosition,
+  readStoredFabPosition,
+  resolvePanelPlacement,
+  writeStoredFabPosition,
+  type FabPosition,
+  type FabPositionStorage,
+} from './fab-geometry.ts'
+import { DRAG_THRESHOLD, KEYBOARD_STEP, useFabDrag } from './fab-drag.ts'
 
 /**
  * Open/closed state for one disclosure surface.
@@ -280,20 +298,36 @@ export function BoardNavEntry({
 /**
  * The floating board (entry ②).
  *
- * A compact button fixed to the bottom-right corner opens the board above it.
- * The panel is a non-modal popover: Escape and an outside press close it,
- * focus moves into it on open and returns to the button on close.
+ * A compact button that the user may drag anywhere in the viewport opens the board
+ * next to itself. Three rules shape this component:
+ *
+ * 1. **The entry owns the geometry.** The panel has no position of its own; it is
+ *    placed from the entry's rectangle every time it opens or the entry moves.
+ *    That is why dragging the entry takes the panel with it.
+ * 2. **A position is remembered, never corrected.** A resize clamps what is drawn
+ *    and leaves storage alone, so unplugging a monitor and plugging it back in
+ *    restores the original placement instead of collapsing it to the smaller
+ *    screen.
+ * 3. **Dragging is not clicking.** A gesture that travels past the threshold is a
+ *    move and suppresses the click that follows it; a gesture below it is a click
+ *    and toggles the panel.
+ *
+ * The panel is a non-modal popover: Escape and an outside press close it, focus
+ * moves into it on open and returns to the button on close.
  */
 export function BoardOverlay({
   controller,
   store,
   resolveNavigation,
   answerQuestion,
+  positionStorage,
 }: {
   readonly controller: OverlayController
   readonly store: BoardStore
   readonly resolveNavigation: () => ((sessionId: string) => void) | undefined
   readonly answerQuestion?: AnswerQuestion | undefined
+  /** Where the remembered position lives; `undefined` keeps it in memory only. */
+  readonly positionStorage?: FabPositionStorage | undefined
 }): ReactElement | null {
   const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
@@ -304,6 +338,138 @@ export function BoardOverlay({
   const panelId = `status-board-overlay-${useId()}`
   const counts = countBoards(state)
   const aria = describeCounts(translate, counts)
+
+  // ── Remembered position ────────────────────────────────────────────────────
+  // `undefined` means "never dragged": the stylesheet's corner (including its
+  // narrow-screen offsets) stays in charge. Only a real placement is stored, so a
+  // reset can return the entry to a media-query-aware default rather than to a
+  // hardcoded 16px.
+  const [position, setPosition] = useState<FabPosition | undefined>(() =>
+    readStoredFabPosition(positionStorage),
+  )
+  // Viewport size is state, not a read at call time: the clamp and the panel
+  // placement both depend on it, and a resize has to re-render to be felt.
+  const [viewport, setViewport] = useState(() => ({
+    width: globalThis.innerWidth ?? 0,
+    height: globalThis.innerHeight ?? 0,
+  }))
+  useEffect(() => {
+    const onResize = (): void => {
+      setViewport({ width: globalThis.innerWidth, height: globalThis.innerHeight })
+    }
+    globalThis.addEventListener('resize', onResize)
+    return () => globalThis.removeEventListener('resize', onResize)
+  }, [])
+
+  const fabBox = useCallback((): { width: number; height: number; left: number; top: number } => {
+    const rect = fabRef.current?.getBoundingClientRect()
+    if (rect === undefined) return { width: 0, height: 0, left: 0, top: 0 }
+    return { width: rect.width, height: rect.height, left: rect.left, top: rect.top }
+  }, [])
+  const readFabPosition = useCallback((): FabPosition => {
+    const box = fabBox()
+    return { left: box.left, top: box.top }
+  }, [fabBox])
+
+  /** Store a placement the user made. Only a deliberate move reaches this. */
+  const commitPosition = useCallback(
+    (next: FabPosition): void => {
+      setPosition(next)
+      writeStoredFabPosition(positionStorage, next)
+    },
+    [positionStorage],
+  )
+
+  /**
+   * Whether the panel was open when the current gesture started.
+   *
+   * Captured on press, because by the time the gesture ends the drag has already
+   * closed it. Reading `open` at release would always say "closed" and the panel
+   * would never reopen after a move.
+   */
+  const openAtPress = useRef(false)
+  const notePress = useCallback((): void => {
+    openAtPress.current = controller.getSnapshot()
+  }, [controller])
+
+  // ── Drag ───────────────────────────────────────────────────────────────────
+  const drag = useFabDrag(readFabPosition, {
+    onDragStart: () => {
+      // Crossing the threshold means "moving", so the panel goes away here rather
+      // than on pointerdown - closing on press would make the entry useless as a
+      // dismiss control.
+      if (open) controller.close()
+    },
+    onDragMove: next => {
+      // Unclamped on purpose: `clampFabPosition` runs at render time so the stored
+      // value keeps the user's intent.
+      setPosition(next)
+    },
+    onDragEnd: (next, moved) => {
+      if (moved <= DRAG_THRESHOLD) return
+      writeStoredFabPosition(positionStorage, next)
+      // Reopen only if it had been open: a move must not pop the board open for
+      // someone who was merely relocating the entry.
+      if (openAtPress.current) controller.toggle()
+    },
+  })
+
+  // ── Panel placement ────────────────────────────────────────────────────────
+  // Measured, not assumed: a fixed guess leaves the panel floating away from the
+  // entry whenever the board is shorter than the guess.
+  const [placement, setPlacement] = useState<{ left: number; top: number } | undefined>(undefined)
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlacement(undefined)
+      return
+    }
+    const panel = panelRef.current
+    if (panel === null) return
+    const box = fabBox()
+    const rect = panel.getBoundingClientRect()
+    const next = resolvePanelPlacement(
+      { left: box.left, top: box.top, width: box.width, height: box.height },
+      { width: rect.width, height: rect.height },
+      { width: globalThis.innerWidth, height: globalThis.innerHeight },
+      FAB_PANEL_GAP,
+      PANEL_EDGE_MARGIN,
+    )
+    setPlacement({ left: next.left, top: next.top })
+  }, [open, position, viewport, fabBox])
+
+  // What to draw: the remembered position clamped into the viewport. Storage keeps
+  // the unclamped value (see the module note).
+  const drawnPosition = useMemo(() => {
+    if (position === undefined) return undefined
+    const box = fabBox()
+    const size = box.width > 0 ? { width: box.width, height: box.height } : { width: 129, height: 34 }
+    return clampFabPosition(position, size, viewport, FAB_EDGE_MARGIN)
+  }, [position, viewport, fabBox])
+
+  const resetPosition = (): void => {
+    clearStoredFabPosition(positionStorage)
+    setPosition(undefined)
+  }
+
+  const onFabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>): void => {
+    const directions: Record<string, readonly [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    }
+    const direction = directions[event.key]
+    if (direction === undefined) return
+    // Arrow keys on a focused button would otherwise scroll the conversation
+    // behind the entry, which looks like the panel misbehaving.
+    event.preventDefault()
+    const step = KEYBOARD_STEP * (event.shiftKey ? 2 : 1)
+    const from = drawnPosition ?? readFabPosition()
+    const next = nudgeFabPosition(from, direction[0] * step, direction[1] * step)
+    commitPosition(next)
+    // Keyboard users cannot drag at all, so the only way back to a sane position is
+    // the reset control - which this commit has just enabled.
+  }
 
   // Escape closes from anywhere: the popover is not modal, so the key must work
   // even while focus sits inside the conversation behind it.
@@ -346,6 +512,11 @@ export function BoardOverlay({
   }, [open])
 
   const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
+  const clamped = drawnPosition
+  const fabStyle =
+    clamped === undefined
+      ? undefined
+      : { left: `${clamped.left}px`, top: `${clamped.top}px`, right: 'auto', bottom: 'auto' }
 
   return (
     <>
@@ -353,20 +524,39 @@ export function BoardOverlay({
       <button
         ref={fabRef}
         type="button"
-        className="status-board__fab"
+        className={drag.dragging ? 'status-board__fab status-board__fab--dragging' : 'status-board__fab'}
+        style={fabStyle}
         aria-label={aria}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         title={aria}
-        onClick={() => controller.toggle()}
+        data-dragging={drag.dragging ? 'true' : 'false'}
+        onPointerDown={event => {
+          notePress()
+          drag.onPointerDown(event)
+        }}
+        onPointerMove={drag.onPointerMove}
+        onPointerUp={drag.onPointerUp}
+        onPointerCancel={drag.onPointerCancel}
+        onKeyDown={onFabKeyDown}
+        onClick={() => {
+          // The click a drag leaves behind must not toggle the panel.
+          if (drag.shouldIgnoreClick()) return
+          controller.toggle()
+        }}
       >
-        <BoardGlyph size={16} />
-        <span className="status-board__fab-label">{translate('panel.shortTitle')}</span>
-        {counts.decision > 0 ? (
-          <span className="status-board__fab-badge" aria-hidden="true">
-            {counts.decision}
+        {/* One marker per board, using the same component and the same "folder"
+            variant the tree puts in front of each section heading, so the entry and
+            the tree cannot drift apart. A zero count keeps its marker dimmed, which
+            is the tree's rule too. */}
+        {(['decision', 'executing', 'recent'] as const).map(id => (
+          <span className="status-board__fab-group" key={id}>
+            <StatusMark bucket={id} variant="folder" empty={counts[id] === 0} />
+            <span className="status-board__fab-count" data-empty={counts[id] === 0}>
+              {counts[id]}
+            </span>
           </span>
-        ) : null}
+        ))}
       </button>
       {open ? (
         <div
@@ -376,12 +566,39 @@ export function BoardOverlay({
           aria-label={translate('panel.title')}
           ref={panelRef}
           tabIndex={-1}
+          style={
+            placement === undefined
+              ? undefined
+              : { left: `${placement.left}px`, top: `${placement.top}px`, right: 'auto', bottom: 'auto' }
+          }
         >
           <div className="status-board__overlay-bar">
             <div className="status-board__overlay-heading">
               <span className="status-board__overlay-title">{translate('panel.shortTitle')}</span>
               <span className="status-board__overlay-subtitle">{translate('summary.total', { total })}</span>
             </div>
+            {/* Reset lives here rather than in the board's own head, which is
+                hidden inside the overlay (the bar already carries the title).
+                Disabled until the entry has actually been moved: a control that
+                can never do anything is noise. */}
+            <button
+              type="button"
+              className="status-board__overlay-reset"
+              aria-label={translate('action.resetPosition')}
+              title={translate('action.resetPosition')}
+              disabled={position === undefined}
+              onClick={resetPosition}
+            >
+              {/* Return-to-corner arrow: the button's only job is putting the entry
+                  back in its default corner, so the glyph points there instead of
+                  using a generic undo arc that reads as a time operation. */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="M5 5l10 10" />
+                <path d="M15 9.5V15h-5.5" />
+                <path d="M19 14v5h-5" />
+              </svg>
+            </button>
             <button
               type="button"
               className="status-board__overlay-close"
