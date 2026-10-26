@@ -36,5 +36,8 @@ pnpm-debug.log*
 # Local scratch
 .tmp/
 scratch/
+# Parallel-agent checkouts. Each one is a real git worktree, so it carries its own
+# gitlink; the parent must never see them as content.
+.worktree/
 # Visual self-check output (styles/preview renders); never part of the package.
 .preview*
