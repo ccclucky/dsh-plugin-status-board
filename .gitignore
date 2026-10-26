@@ -41,3 +41,5 @@ scratch/
 .worktree/
 # Visual self-check output (styles/preview renders); never part of the package.
 .preview*
+# Prototype scratch: interactive HTML used to agree on feel before implementing.
+.scratch/
