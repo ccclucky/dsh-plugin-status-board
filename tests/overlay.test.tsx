@@ -257,6 +257,60 @@ describe('BoardOverlay (entry ②)', () => {
     })
     expect(container.querySelector('[role="dialog"]')).toBeNull()
   })
+
+  it('recalculates placement when the panel content changes size', () => {
+    let resizeCallback: (() => void) | undefined
+    class MockResizeObserver {
+      constructor(callback: () => void) {
+        resizeCallback = callback
+      }
+      observe() {}
+      disconnect() {
+        resizeCallback = undefined
+      }
+    }
+    const originalRO = globalThis.ResizeObserver
+    const originalWidth = globalThis.innerWidth
+    const originalHeight = globalThis.innerHeight
+    globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
+
+    try {
+      globalThis.innerWidth = 1280
+      globalThis.innerHeight = 800
+
+      const { container } = mount(makeStore([]))
+      const fab = container.querySelector<HTMLButtonElement>('.status-board__fab')
+      if (fab === null) throw new Error('no entry')
+      stubFabRect(fab, { left: 1100, top: 700, width: 129, height: 34 })
+
+      act(() => {
+        fab.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+
+      const dialog = container.querySelector<HTMLElement>('[role="dialog"]')
+      if (dialog === null) throw new Error('no dialog')
+
+      let panelHeight = 200
+      dialog.getBoundingClientRect = () =>
+        ({ left: 0, top: 0, width: 382, height: panelHeight, right: 382, bottom: panelHeight, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+
+      act(() => {
+        resizeCallback?.()
+      })
+      expect(dialog.style.top).toBe('490px')
+
+      // Content grows to 350px (e.g. expanding card): anchor top (700) - gap (10) - panel height (350) = 340px
+      panelHeight = 350
+      act(() => {
+        resizeCallback?.()
+      })
+      expect(dialog.style.top).toBe('340px')
+    } finally {
+      globalThis.ResizeObserver = originalRO
+      globalThis.innerWidth = originalWidth
+      globalThis.innerHeight = originalHeight
+    }
+  })
 })
 
 describe('floating entry: dragging versus clicking', () => {
