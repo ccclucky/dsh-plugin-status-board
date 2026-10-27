@@ -231,8 +231,9 @@ describe('describeCounts', () => {
 
     // The dot lives on the shared marker (one mark per row, not a second element).
     expect(container.querySelector('.status-board-status[data-unopened="true"]')).not.toBeNull()
-    // The folder header keeps the count visible even when the folder is collapsed.
-    expect(container.querySelector('.status-board-tree__count-unopened')?.textContent).toContain('1')
+    // The unopened folder is promoted as its own folder in the tree.
+    expect(container.querySelector('.status-board-tree__folder[data-bucket="unread"]')).not.toBeNull()
+    expect(container.querySelector('.status-board-tree__folder[data-bucket="unread"] .status-board-tree__count')?.textContent).toContain('1')
   })
 
   it('renders the tree without the hook, so a bare shell still works', () => {

@@ -97,22 +97,23 @@ describe('completion reminder', () => {
     )
   }
 
-  it('marks an unopened completion and counts it in the board header', async () => {
+  it('promotes an unopened completion into the dedicated unread board', async () => {
     const store = await storeFor([row('r', 'done and unseen')])
     const markup = withStatuses(store, new Map([['r', { completionUnread: true }]]))
     // Match the element, not the stylesheet: the panel inlines its own CSS, so a
     // bare `data-unopened="true"` would also match the attribute selector and the
     // assertion would pass even with no row marked.
     expect(markup).toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
-    // The header reports how many, which is what stays readable while collapsed.
-    expect(markup).toMatch(/class="status-board__count-unopened"/)
+    // The dedicated unread board card is rendered
+    expect(markup).toMatch(/data-bucket="unread"/)
+    expect(markup).toContain('Completed unread')
   })
 
-  it('leaves a plainly-seen row unmarked', async () => {
+  it('leaves a plainly-seen row in recent without an unread board', async () => {
     const store = await storeFor([row('r', 'seen already')])
     const markup = withStatuses(store, new Map([['r', { completionUnread: false }]]))
     expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
-    expect(markup).not.toMatch(/class="status-board__count-unopened"/)
+    expect(markup).not.toMatch(/data-bucket="unread"/)
   })
 
   it('renders every row when the platform provides no status hook at all', async () => {
@@ -121,11 +122,11 @@ describe('completion reminder', () => {
     const store = await storeFor([row('r', 'no hook here')])
     const markup = renderToStaticMarkup(createElement(BoardPanel, { store }))
     expect(markup).toContain('no hook here')
+    expect(markup).not.toMatch(/data-bucket="unread"/)
     expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
   })
 
-  it('does not count an unread session that the filter hides', async () => {
-    // A header that counts rows it no longer lists is a small lie users notice.
+  it('displays multiple unread sessions in the unread board', async () => {
     const store = await storeFor([row('a', 'alpha done'), row('b', 'beta done')])
     const markup = withStatuses(
       store,
@@ -134,8 +135,45 @@ describe('completion reminder', () => {
         ['b', { completionUnread: true }],
       ]),
     )
-    expect(markup).toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
-    expect(markup).toMatch(/class="status-board__count-unopened"/)
+    expect(markup).toMatch(/data-bucket="unread"/)
+    expect(markup).toContain('alpha done')
+    expect(markup).toContain('beta done')
+  })
+
+  it('filters unread sessions through the search filter', async () => {
+    const store = await storeFor([row('a', 'alpha unread'), row('b', 'beta unread')])
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const statusMap = new Map([
+      ['a', { completionUnread: true }],
+      ['b', { completionUnread: true }],
+    ])
+    act(() => {
+      root.render(
+        createElement(
+          UnreadStatusContext.Provider,
+          { value: statusMap },
+          createElement(BoardPanel, { store }),
+        ),
+      )
+    })
+    const unreadSection = container.querySelector('[data-bucket="unread"]')
+    expect(unreadSection?.textContent).toContain('alpha unread')
+    expect(unreadSection?.textContent).toContain('beta unread')
+
+    const input = container.querySelector<HTMLInputElement>('input.status-board__filter')
+    if (input) {
+      act(() => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        setter?.call(input, 'alpha')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      expect(container.querySelector('[data-bucket="unread"]')?.textContent).toContain('alpha unread')
+      expect(container.querySelector('[data-bucket="unread"]')?.textContent).not.toContain('beta unread')
+    }
+    act(() => root.unmount())
+    container.remove()
   })
 })
 

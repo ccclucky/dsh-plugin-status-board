@@ -8,15 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A segmented donut floating button (FAB) with status breakdown tooltip.** Replaces the
+  pill with a 44px circular button carrying an SVG donut ring whose arcs scale with the
+  proportions of the four session states (`decision`, `unread`, `executing`, `recent`).
+  Displays core pending work in the center and expands a detailed four-status tally card on
+  hover.
+- **Dedicated completion unread board section.** Sessions with unopened completions are
+  promoted into an independent "Completed unread" section in both the popover panel and
+  the sidebar tree rather than being buried in recent records, keeping the inside boards
+  in 100% parity with the four-segment floating ring. The section disappears when all
+  completions are viewed.
 - **A completion reminder on session rows.** A session that finished a run, is not the one
   on screen, and has not been opened since now carries a small green dot on its status
-  marker, and each board's header reports how many such rows it holds (`12 · 2 未看`). The
-  state is the platform's own `completionUnread`, read through the `useSessionStatus`
-  standard slot prop, so the board cannot disagree with the sidebar about what "unread"
-  means and nothing is stored locally.
-  It is a marker rather than a fourth board on purpose: the flag is a process-local
-  observation (a first scan does not set it, and a reload clears it), while the three
-  boards are claims that survive a reload. See `docs/adr/0002`.
+  marker. The state is the platform's own `completionUnread`, read through the
+  `useSessionStatus` standard slot prop, so the board cannot disagree with the sidebar
+  about what "unread" means and nothing is stored locally.
 - `GLOSSARY.md` gains **完成未读** and a sharpened **近期记录**, so neither can drift into
   meaning "unread messages" in a later change.
 

@@ -48,6 +48,7 @@ import {
 import { DRAG_THRESHOLD, KEYBOARD_STEP, useFabDrag } from './fab-drag.ts'
 import {
   UnreadStatusContext,
+  countCompletionUnread,
   useSessionStatusMap,
   type UseSessionStatus,
 } from './completion-unread.ts'
@@ -101,14 +102,67 @@ function countBoards(state: BoardState): Record<'decision' | 'executing' | 'rece
 /** Accessible name that states every count, since the trigger is icon+text only. */
 export function describeCounts(
   translate: ReturnType<typeof createTranslate>,
-  counts: Record<'decision' | 'executing' | 'recent', number>,
+  counts: { readonly decision: number; readonly executing: number; readonly recent: number; readonly unread?: number | undefined },
 ): string {
-  return [
+  const parts = [
     translate('panel.title'),
     `${translate('bucket.decision')} ${counts.decision}`,
-    `${translate('bucket.executing')} ${counts.executing}`,
-    `${translate('bucket.recent')} ${counts.recent}`,
-  ].join('，')
+  ]
+  if (counts.unread !== undefined && counts.unread > 0) {
+    parts.push(`${translate('bucket.unread')} ${counts.unread}`)
+  }
+  parts.push(`${translate('bucket.executing')} ${counts.executing}`)
+  parts.push(`${translate('bucket.recent')} ${counts.recent}`)
+  return parts.join('，')
+}
+
+/** Circumference of the 44px SVG ring (r = 18). */
+export const DONUT_CIRCUMFERENCE = 113.097
+
+export interface DonutSegmentArc {
+  readonly strokeDasharray: string
+  readonly strokeDashoffset: number
+  readonly opacity: number
+}
+
+/** Compute stroke dasharray and offset for each of the 4 donut arcs. */
+export function computeDonutArcs(counts: {
+  readonly decision: number
+  readonly unread: number
+  readonly executing: number
+  readonly recent: number
+}): Record<'decision' | 'unread' | 'executing' | 'recent', DonutSegmentArc> {
+  const total = counts.decision + counts.unread + counts.executing + counts.recent
+  if (total === 0) {
+    return {
+      decision: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
+      unread: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
+      executing: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
+      recent: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
+    }
+  }
+
+  let offset = 0
+  const seg = (count: number): DonutSegmentArc => {
+    if (count <= 0) {
+      return { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 }
+    }
+    const arc = (count / total) * DONUT_CIRCUMFERENCE
+    const res: DonutSegmentArc = {
+      strokeDasharray: `${arc.toFixed(2)} ${(DONUT_CIRCUMFERENCE - arc).toFixed(2)}`,
+      strokeDashoffset: -offset,
+      opacity: 1,
+    }
+    offset += arc
+    return res
+  }
+
+  return {
+    decision: seg(counts.decision),
+    unread: seg(counts.unread),
+    executing: seg(counts.executing),
+    recent: seg(counts.recent),
+  }
 }
 
 /** Find the direct child of `nav` that contains `row`, if one exists. */
@@ -370,7 +424,26 @@ export function BoardOverlay({
   const wasOpen = useRef(false)
   const panelId = `status-board-overlay-${useId()}`
   const counts = countBoards(state)
-  const aria = describeCounts(translate, counts)
+  const recentBoard = state.board.buckets.find(b => b.id === 'recent')
+  const unreadCount = countCompletionUnread(statusMap, recentBoard?.entries ?? [])
+  const recentCount = Math.max(0, counts.recent - unreadCount)
+  const total = counts.decision + unreadCount + counts.executing + recentCount
+  const urgentCount = counts.decision + unreadCount
+  const centerText = urgentCount > 0 ? urgentCount : (total > 0 ? total : 0)
+
+  const donutArcs = computeDonutArcs({
+    decision: counts.decision,
+    unread: unreadCount,
+    executing: counts.executing,
+    recent: recentCount,
+  })
+
+  const aria = describeCounts(translate, {
+    decision: counts.decision,
+    unread: unreadCount,
+    executing: counts.executing,
+    recent: recentCount,
+  })
 
   // ── Remembered position ────────────────────────────────────────────────────
   // `undefined` means "never dragged": the stylesheet's corner (including its
@@ -494,7 +567,7 @@ export function BoardOverlay({
   const drawnPosition = useMemo(() => {
     if (position === undefined) return undefined
     const box = fabBox()
-    const size = box.width > 0 ? { width: box.width, height: box.height } : { width: 129, height: 34 }
+    const size = box.width > 0 ? { width: box.width, height: box.height } : { width: 44, height: 44 }
     return clampFabPosition(position, size, viewport, FAB_EDGE_MARGIN)
   }, [position, viewport, fabBox])
 
@@ -563,7 +636,6 @@ export function BoardOverlay({
     }
   }, [open])
 
-  const total = state.board.buckets.reduce((sum, bucket) => sum + bucket.entries.length, 0)
   const clamped = drawnPosition
   const fabStyle =
     clamped === undefined
@@ -597,18 +669,102 @@ export function BoardOverlay({
           controller.toggle()
         }}
       >
-        {/* One marker per board, using the same component and the same "folder"
-            variant the tree puts in front of each section heading, so the entry and
-            the tree cannot drift apart. A zero count keeps its marker dimmed, which
-            is the tree's rule too. */}
-        {(['decision', 'executing', 'recent'] as const).map(id => (
-          <span className="status-board__fab-group" key={id}>
-            <StatusMark bucket={id} variant="folder" empty={counts[id] === 0} />
-            <span className="status-board__fab-count" data-empty={counts[id] === 0}>
-              {counts[id]}
-            </span>
-          </span>
-        ))}
+        <svg className="status-board__fab-svg" viewBox="0 0 44 44" aria-hidden="true">
+          <circle className="status-board__fab-track" cx="22" cy="22" r="18" />
+          <circle
+            className="status-board__fab-seg status-board__fab-seg--decision"
+            cx="22"
+            cy="22"
+            r="18"
+            style={{
+              strokeDasharray: donutArcs.decision.strokeDasharray,
+              strokeDashoffset: `${donutArcs.decision.strokeDashoffset}px`,
+              opacity: donutArcs.decision.opacity,
+            }}
+          />
+          <circle
+            className="status-board__fab-seg status-board__fab-seg--unread"
+            cx="22"
+            cy="22"
+            r="18"
+            style={{
+              strokeDasharray: donutArcs.unread.strokeDasharray,
+              strokeDashoffset: `${donutArcs.unread.strokeDashoffset}px`,
+              opacity: donutArcs.unread.opacity,
+            }}
+          />
+          <circle
+            className="status-board__fab-seg status-board__fab-seg--executing"
+            cx="22"
+            cy="22"
+            r="18"
+            style={{
+              strokeDasharray: donutArcs.executing.strokeDasharray,
+              strokeDashoffset: `${donutArcs.executing.strokeDashoffset}px`,
+              opacity: donutArcs.executing.opacity,
+            }}
+          />
+          <circle
+            className="status-board__fab-seg status-board__fab-seg--recent"
+            cx="22"
+            cy="22"
+            r="18"
+            style={{
+              strokeDasharray: donutArcs.recent.strokeDasharray,
+              strokeDashoffset: `${donutArcs.recent.strokeDashoffset}px`,
+              opacity: donutArcs.recent.opacity,
+            }}
+          />
+        </svg>
+        <span className="status-board__fab-center" aria-hidden="true">
+          {centerText}
+        </span>
+
+        {/* Hover Tooltip breakdown */}
+        <div className="status-board__fab-tooltip" role="tooltip" aria-hidden="true">
+          <div className="status-board__fab-tooltip-head">
+            <span>{translate('panel.shortTitle')}</span>
+            <span>{translate('summary.total', { total })}</span>
+          </div>
+          <div className="status-board__fab-tooltip-list">
+            <div className="status-board__fab-row">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="decision" variant="folder" empty={counts.decision === 0} />
+                <span>{translate('bucket.decision')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={counts.decision === 0}>
+                {counts.decision}
+              </span>
+            </div>
+            <div className="status-board__fab-row">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="unread" variant="folder" empty={unreadCount === 0} />
+                <span>{translate('bucket.unread')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={unreadCount === 0}>
+                {unreadCount}
+              </span>
+            </div>
+            <div className="status-board__fab-row">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="executing" variant="folder" empty={counts.executing === 0} />
+                <span>{translate('bucket.executing')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={counts.executing === 0}>
+                {counts.executing}
+              </span>
+            </div>
+            <div className="status-board__fab-row">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="recent" variant="folder" empty={recentCount === 0} />
+                <span>{translate('bucket.recent')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={recentCount === 0}>
+                {recentCount}
+              </span>
+            </div>
+          </div>
+        </div>
       </button>
       {open ? (
         <div

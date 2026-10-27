@@ -136,7 +136,7 @@ export function Row({
   answerQuestion,
 }: {
   readonly entry: BoardEntry
-  readonly bucket: BucketId
+  readonly bucket: BucketId | 'unread'
   readonly translate: Translate
   readonly now: number
   readonly onOpen: ((sessionId: string) => void) | undefined
@@ -230,8 +230,9 @@ function Bucket({
   query,
   onOpenSession,
   answerQuestion,
+  entriesOverride,
 }: {
-  readonly id: BucketId
+  readonly id: BucketId | 'unread'
   readonly state: BoardState
   readonly store: BoardStore
   readonly translate: Translate
@@ -239,9 +240,12 @@ function Bucket({
   readonly query: string
   readonly onOpenSession: ((sessionId: string) => void) | undefined
   readonly answerQuestion: AnswerQuestion | undefined
+  readonly entriesOverride?: readonly BoardEntry[] | undefined
 }): ReactElement | null {
   const board = state.board.buckets.find(candidate => candidate.id === id)
-  if (board === undefined) return null
+  const entries = entriesOverride ?? board?.entries
+  if (entries === undefined) return null
+  if (id === 'unread' && entries.length === 0) return null
 
   // One `useId` per board keeps DOM ids unique when the sidebar is torn down and
   // remounted (or two windows are open).
@@ -250,8 +254,9 @@ function Bucket({
   const regionId = `status-board-region-${instanceId}`
 
   const statuses = useUnreadStatuses()
-  const visible = matchesFilter(board.entries, query)
-  const collapsed = isCollapsed(state.collapse, id)
+  const visible = matchesFilter(entries, query)
+  const [unreadCollapsed, setUnreadCollapsed] = useState(false)
+  const collapsed = id === 'unread' ? unreadCollapsed : isCollapsed(state.collapse, id)
   const count = visible.length
   const name = translate(`bucket.${id}` as MessageKey)
   const hint = id === 'recent'
@@ -261,13 +266,13 @@ function Bucket({
   const filtering = query.trim().length > 0
   // Counted over the rows this board actually lists, so a search that hides a row
   // cannot leave the header claiming unread work that is no longer on screen.
-  const unopenedCount = countCompletionUnread(statuses, visible)
+  const unopenedCount = id === 'unread' ? 0 : countCompletionUnread(statuses, visible)
 
   // While filtering, a board with no match is noise: the user asked a question
   // and this board has nothing to say about it.
   if (filtering && count === 0) return null
   // An empty board is hidden when the operator turned headers off.
-  if (!filtering && count === 0 && !state.config.showEmptyBuckets) return null
+  if (!filtering && count === 0 && (id === 'unread' || !state.config.showEmptyBuckets)) return null
 
   // While the list is still being enumerated, "no sessions" is not a fact yet.
   const loading = state.status === 'loading' && count === 0
@@ -282,7 +287,10 @@ function Bucket({
           aria-controls={regionId}
           aria-label={bucketToggleLabel(translate, name, collapsed, count)}
           title={hint}
-          onClick={() => store.toggle(id)}
+          onClick={() => {
+            if (id === 'unread') setUnreadCollapsed(prev => !prev)
+            else store.toggle(id)
+          }}
         >
           <Chevron collapsed={collapsed} />
           <StatusMark bucket={id} variant="folder" empty={count === 0} />
@@ -320,7 +328,7 @@ function Bucket({
             ))}
           </ul>
         )}
-        {board.truncated > 0 ? (
+        {board?.truncated && board.truncated > 0 ? (
           <p className="status-board__truncated">{translate('summary.truncated', { count: board.truncated })}</p>
         ) : null}
       </div>
@@ -351,17 +359,25 @@ function BoardPanelBody({
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
   const now = useRelativeClock()
+  const statuses = useUnreadStatuses()
   const [query, setQuery] = useState('')
   const headingId = `status-board-title-${useId()}`
   const filterId = `status-board-filter-${useId()}`
   const total = totalRows(state.board)
 
+  const recentBoard = state.board.buckets.find(b => b.id === 'recent')
+  const unreadEntries = (recentBoard?.entries ?? []).filter(entry => isCompletionUnread(statuses, entry.id))
+  const cleanRecentEntries = (recentBoard?.entries ?? []).filter(entry => !isCompletionUnread(statuses, entry.id))
+
   // How many rows survive the filter, so "no match" can be told apart from
   // "nothing here".
+  const visibleUnreadTotal = matchesFilter(unreadEntries, query).length
   const visibleTotal = BUCKET_IDS.reduce((sum, id) => {
     const board = state.board.buckets.find(candidate => candidate.id === id)
-    return sum + (board === undefined ? 0 : matchesFilter(board.entries, query).length)
-  }, 0)
+    if (board === undefined) return sum
+    const entries = id === 'recent' ? cleanRecentEntries : board.entries
+    return sum + matchesFilter(entries, query).length
+  }, visibleUnreadTotal)
 
   return (
     <div className="status-board" aria-labelledby={headingId}>
@@ -401,10 +417,21 @@ function BoardPanelBody({
       ) : null}
 
       <div className="status-board__scroll">
-        {BUCKET_IDS.map(id => (
+        <Bucket
+          key="decision"
+          id="decision"
+          state={state}
+          store={store}
+          translate={translate}
+          now={now}
+          query={query}
+          onOpenSession={onOpenSession}
+          answerQuestion={answerQuestion}
+        />
+        {unreadEntries.length > 0 ? (
           <Bucket
-            key={id}
-            id={id}
+            key="unread"
+            id="unread"
             state={state}
             store={store}
             translate={translate}
@@ -412,8 +439,32 @@ function BoardPanelBody({
             query={query}
             onOpenSession={onOpenSession}
             answerQuestion={answerQuestion}
+            entriesOverride={unreadEntries}
           />
-        ))}
+        ) : null}
+        <Bucket
+          key="executing"
+          id="executing"
+          state={state}
+          store={store}
+          translate={translate}
+          now={now}
+          query={query}
+          onOpenSession={onOpenSession}
+          answerQuestion={answerQuestion}
+        />
+        <Bucket
+          key="recent"
+          id="recent"
+          state={state}
+          store={store}
+          translate={translate}
+          now={now}
+          query={query}
+          onOpenSession={onOpenSession}
+          answerQuestion={answerQuestion}
+          entriesOverride={cleanRecentEntries}
+        />
       </div>
 
       {state.status === 'loading' && total === 0 ? (

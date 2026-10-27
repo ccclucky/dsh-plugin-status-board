@@ -23,6 +23,10 @@
     "recentUnit": "条近期记录",
     "decisionEmpty": "没有等你拍板的事",
     "executingEmpty": "没有正在执行的会话",
+    "unread": "完成未看",
+    "unreadHint": "这些会话已执行完成，等待查看结果",
+    "unreadEmpty": "没有完成未看的会话",
+    "unreadUnit": "个完成未看",
     "unopened": "未看",
     "recentEmpty": "近期没有动静",
     "recentHintDays": "最近 {days} 天内有动静"

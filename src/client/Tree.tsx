@@ -16,8 +16,8 @@
  * @module dsh-plugin-status-board/client/Tree
  */
 
-import { useSyncExternalStore, type ReactElement } from 'react'
-import { BUCKET_IDS, type BoardEntry, type BucketId } from '../shared/types.ts'
+import { useState, useSyncExternalStore, type ReactElement } from 'react'
+import type { BoardEntry, BucketId } from '../shared/types.ts'
 import { bucketToggleLabel, isCollapsed } from '../shared/board.ts'
 import { createTranslate, formatRelativeTime, recentWindowHint, type Translate } from '../shared/i18n.ts'
 import type { BoardStore } from './store.ts'
@@ -45,7 +45,7 @@ function TreeRow({
   onOpenSession,
 }: {
   readonly entry: BoardEntry
-  readonly bucket: BucketId
+  readonly bucket: BucketId | 'unread'
   readonly translate: Translate
   readonly now: number
   readonly onOpenSession: ((sessionId: string) => void) | undefined
@@ -100,27 +100,33 @@ function TreeFolder({
   translate,
   now,
   onOpenSession,
+  entriesOverride,
 }: {
-  readonly id: BucketId
+  readonly id: BucketId | 'unread'
   readonly store: BoardStore
   readonly translate: Translate
   readonly now: number
   readonly onOpenSession: ((sessionId: string) => void) | undefined
+  readonly entriesOverride?: readonly BoardEntry[] | undefined
 }): ReactElement | null {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const statuses = useUnreadStatuses()
   const board = state.board.buckets.find(candidate => candidate.id === id)
-  if (board === undefined) return null
-  const collapsed = isCollapsed(state.collapse, id)
+  const entries = entriesOverride ?? board?.entries
+  if (entries === undefined) return null
+  if (id === 'unread' && entries.length === 0) return null
+
+  const [unreadCollapsed, setUnreadCollapsed] = useState(false)
+  const collapsed = id === 'unread' ? unreadCollapsed : isCollapsed(state.collapse, id)
   const name = translate(`bucket.${id}`)
   const hint = id === 'recent'
     ? recentWindowHint(state.board.windowHours, translate)
     : translate(`bucket.${id}Hint`, { hours: state.board.windowHours })
   const empty = translate(`bucket.${id}Empty`)
-  const count = board.entries.length
+  const count = entries.length
   // Counted from the rows this folder lists, not from the whole status map:
   // the map also holds sessions this board does not render.
-  const unopenedCount = countCompletionUnread(statuses, board.entries)
+  const unopenedCount = id === 'unread' ? 0 : countCompletionUnread(statuses, entries)
   const regionId = `status-board-tree-region-${id}`
   const loading = state.status === 'loading' && count === 0
 
@@ -134,7 +140,10 @@ function TreeFolder({
           aria-controls={regionId}
           aria-label={bucketToggleLabel(translate, name, collapsed, count)}
           title={hint}
-          onClick={() => store.toggle(id)}
+          onClick={() => {
+            if (id === 'unread') setUnreadCollapsed((prev: boolean) => !prev)
+            else store.toggle(id)
+          }}
         >
           <Chevron collapsed={collapsed} />
           <StatusMark bucket={id} variant="folder" empty={count === 0} />
@@ -157,7 +166,7 @@ function TreeFolder({
           <p className="status-board-tree__empty">{empty}</p>
         ) : (
           <ul className="status-board-tree__rows">
-            {board.entries.map(entry => (
+            {entries.map(entry => (
               <TreeRow
                 key={entry.id}
                 entry={entry}
@@ -169,7 +178,7 @@ function TreeFolder({
             ))}
           </ul>
         )}
-        {board.truncated > 0 ? (
+        {board?.truncated && board.truncated > 0 ? (
           <p className="status-board-tree__truncated">{translate('summary.truncated', { count: board.truncated })}</p>
         ) : null}
       </div>
@@ -186,6 +195,11 @@ export function StatusTree({ store, onOpenSession }: TreeProps): ReactElement {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const translate = createTranslate(state.locale)
   const now = useRelativeClock()
+  const statuses = useUnreadStatuses()
+
+  const recentBoard = state.board.buckets.find(b => b.id === 'recent')
+  const unreadEntries = (recentBoard?.entries ?? []).filter(entry => isCompletionUnread(statuses, entry.id))
+  const cleanRecentEntries = (recentBoard?.entries ?? []).filter(entry => !isCompletionUnread(statuses, entry.id))
 
   return (
     <div className="status-board-tree" role="group" aria-label={translate('tree.label')}>
@@ -203,9 +217,26 @@ export function StatusTree({ store, onOpenSession }: TreeProps): ReactElement {
           {translate('state.loading')}
         </p>
       ) : null}
-      {BUCKET_IDS.map(id => (
-        <TreeFolder key={id} id={id} store={store} translate={translate} now={now} onOpenSession={onOpenSession} />
-      ))}
+      <TreeFolder id="decision" store={store} translate={translate} now={now} onOpenSession={onOpenSession} />
+      {unreadEntries.length > 0 ? (
+        <TreeFolder
+          id="unread"
+          store={store}
+          translate={translate}
+          now={now}
+          onOpenSession={onOpenSession}
+          entriesOverride={unreadEntries}
+        />
+      ) : null}
+      <TreeFolder id="executing" store={store} translate={translate} now={now} onOpenSession={onOpenSession} />
+      <TreeFolder
+        id="recent"
+        store={store}
+        translate={translate}
+        now={now}
+        onOpenSession={onOpenSession}
+        entriesOverride={cleanRecentEntries}
+      />
     </div>
   )
 }

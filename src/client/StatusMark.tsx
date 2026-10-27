@@ -41,7 +41,7 @@ export function StatusMark({
   empty = false,
   unopened = false,
 }: {
-  readonly bucket: BucketId
+  readonly bucket: BucketId | 'unread'
   readonly variant: StatusMarkVariant
   /** A directory with no sessions stays still and dimmed; the state is not live. */
   readonly empty?: boolean | undefined

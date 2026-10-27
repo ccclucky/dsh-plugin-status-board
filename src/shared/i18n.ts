@@ -36,9 +36,11 @@ export interface LocaleFile {
   readonly bucket: {
     readonly decision: string
     readonly executing: string
+    readonly unread: string
     readonly recent: string
     readonly decisionHint: string
     readonly executingHint: string
+    readonly unreadHint: string
     readonly recentHint: string
     /** Day-scale variant used when the configured window is a whole number of days. */
     readonly recentHintDays: string
@@ -48,10 +50,12 @@ export interface LocaleFile {
     /** Noun phrase that turns a board's count into a readout, e.g. "waiting on you". */
     readonly decisionUnit: string
     readonly executingUnit: string
+    readonly unreadUnit: string
     readonly recentUnit: string
     /** Per-board empty copy; more specific than the shared `empty`. */
     readonly decisionEmpty: string
     readonly executingEmpty: string
+    readonly unreadEmpty: string
     readonly recentEmpty: string
       /** Suffix appended to a board's count: finished and not yet opened. */
       readonly unopened: string
