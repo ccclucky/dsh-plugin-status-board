@@ -2,7 +2,7 @@
 
 # Session Status Board
 
-**A DSH plugin that sorts your sessions into three collapsible boards — so you can see at a glance where every session actually stands.**
+**A DSH plugin that sorts your sessions into collapsible boards — so you can see at a glance where every session actually stands.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/dsh-plugin-status-board.svg)](https://www.npmjs.com/package/dsh-plugin-status-board)
@@ -19,15 +19,16 @@
 
 ## What it is
 
-`dsh-plugin-status-board` is a Web UI plugin for DeepSeek Harness (DSH). It takes the sessions scattered down the sidebar and re-groups them by **what they actually need from you right now**, across three collapsible boards:
+`dsh-plugin-status-board` is a Web UI plugin for DeepSeek Harness (DSH). It takes the sessions scattered down the sidebar and re-groups them by **what they actually need from you right now**, across collapsible boards:
 
 | Board | Rule | The question it answers |
 | :--- | :--- | :--- |
 | **Needs my decision** | The session has an unanswered `ask_user_question` in its `userQuestions` projection (plan review included) | “What must I handle now?” |
 | **Running** | The agent is working and needs nothing from you | “What is running in the background?” |
+| **Completed unread** | The platform's own `completionUnread` state: the session finished a run, is not on screen, and has not been opened since | “What finished without me seeing the result?” |
 | **Recent records** | Everything else that saw activity inside the default 7-day window | “What moved recently?” |
 
-Classification is **exclusive**: one session appears on exactly one board. That is the point — the native sidebar sorts by workspace and time, so it cannot tell you *who is waiting on you*; this board sorts by **action priority**.
+The three classifier boards are **exclusive**: one session lands on exactly one of them. "Completed unread" does not take part in classification — it is a reminder the platform broadcasts in memory (cleared on reload), so it lives as a permanent section lifted out of "Recent records"; rows on the decision/running boards that carry an unread completion get a green dot on their status mark instead of being moved. That is the point of the whole board — the native sidebar sorts by workspace and time, so it cannot tell you *who is waiting on you*; this board sorts by **action priority**.
 
 ## Screenshots
 
@@ -35,7 +36,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
   <img src="https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-board.png" alt="Sidebar tree and floating board" width="820">
 </p>
 
-| Sidebar tree + pill | Decision card (demo data) |
+| Sidebar tree + floating entry | Decision card (demo data) |
 | :---: | :---: |
 | ![Sidebar tree](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-tree.png) | ![Decision card](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-card.png) |
 
@@ -43,28 +44,31 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 | :---: | :---: |
 | ![Dark theme](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/dark-board.png) | ![Interaction](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/demo-collapse.gif) |
 
-> Three status folders in the sidebar; the bottom-right pill opens the full board. Folder marks are static; session rows breathe or pulse while a decision or run is live.
+> Four status folders in the sidebar; the floating entry opens the full board. Folder marks are static; session rows breathe or pulse while a decision or run is live, and carry a green dot when a completion went unopened.
 
 ---
 
 ## Features
 
-- **Two entry surfaces, split by job** — the sidebar row expands **3 status folders** (like 3 project groups); a session row opens that session. A compact bottom-right pill opens the **full board**.
+- **Two entry surfaces, split by job** — the sidebar row expands **4 status folders** (like project groups); a session row opens that session. The floating entry opens the **full board**.
+- **The floating entry is a segmented donut button** — a 44px round button whose SVG ring is divided into four arcs coloured by each state's share (decision → running → unread → recent). The centre shows the number that matters most: the sum of "needs my decision" and "completed unread" when any is pending, otherwise the session total. Hovering or focusing expands a four-status tally card.
+- **A draggable floating entry**: move it anywhere and the board follows, because the panel derives its
+  placement from the entry rather than from a fixed corner. The position is remembered; shrinking the
+  window or unplugging a monitor only pulls it back into view temporarily. In the upper half of the
+  viewport the panel flips to open downward.
+- **Completed unread has its own section** — sessions that finished without being looked at are no longer buried in "Recent records"; the sidebar tree and the floating board both carry a permanent "Completed unread" section, in step with the ring's four segments.
+- **A completion reminder on rows** — a session with an unopened completion gets a small green dot on the shoulder of its status mark. State and reminder are not exclusive: a row can be on "Needs my decision" *and* carry an unread completion. The state is the platform's own, read through the `useSessionStatus` standard slot prop — nothing is stored locally, so the board can never disagree with the native sidebar's green dot.
 - **The sidebar tree is navigation only** — click a session exactly like the Workspace browser; no approval or answer controls live in the tree.
 - **Status marks carry state, not just colour** — directories are static (a filled amber dot, a blue arc, a grey dot); session rows move only when it matters (a hollow amber ring breathes for decisions, a blue arc pulses for work in flight, history stays still). Nothing rotates; motion switches off under reduced-motion.
 - **A draggable floating entry**: move it anywhere and the board follows, because the panel derives its
   placement from the entry rather than from a fixed corner. The position is remembered; shrinking the
   window or unplugging a monitor only pulls it back into view temporarily. In the upper half of the
   viewport the panel flips to open downward.
-- **Three status markers on the entry**, drawn with the same component and shape language as the sidebar
-  tree (amber dot in a halo for a decision, blue open arc for work in flight, grey dot for recent), each
-  followed by its count and dimmed when the count is zero. Narrow viewports keep the markers, drop the
-  numbers.
 - **Inline question card in the floating board** — decision rows expand; `continued` questions submit in place, while `open` questions point at the session's own card.
-- **Three collapsible boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open.
+- **Three collapsible classifier boards** — `Needs my decision` / `Running` / `Recent records`. Only the archival board starts collapsed, so the two that matter stay open. "Completed unread" stays permanently expanded and takes none of the configuration options.
 - **Correct precedence** — a session waiting on your decision lands on the decision board even while its agent is still running; it never drowns in "Running".
 - **Live, not polled** — subscribes to the session list Harness already publishes. No polling, no re-scanning session logs.
-- **Remembers your collapse choices** — the 3 sidebar folders and 3 board sections share one set of choices, persisted per browser in `localStorage`.
+- **Remembers your collapse choices** — the sidebar folders and the three classifier board sections share one set of choices, persisted per browser in `localStorage`.
 - **Bilingual** — UI copy and the Plugin Manager's title/description follow the Harness language setting (Chinese / English).
 - **Theme-aware** — every colour comes from Harness theme tokens, so light and dark themes follow automatically.
 - **Keyboard and screen-reader accessible** — each board's title is a real `<h2>` wrapping a disclosure `<button>` (the WAI-ARIA accordion pattern), with `aria-expanded` and an `aria-controls` that always resolves; the label announces the board, the action and the row count. The panel is named via `aria-labelledby`, and DOM ids come from `useId`, so two mounted panels never collide.
@@ -78,7 +82,7 @@ Classification is **exclusive**: one session appears on exactly one board. That 
 
 1. Open the DSH Web UI → **Settings → Plugins**.
 2. Choose **Install bundle** and supply the **absolute path** to this package (local directory install), or the package name once published.
-3. Reload the page. A **Session Status Board** row appears in the sidebar nav list. Clicking it expands 3 status folders; clicking a session opens it. The floating pill in the bottom-right corner opens the full board. Press `Esc`, click outside the panel, or use its × to dismiss.
+3. Reload the page. A **Session Status Board** row appears in the sidebar nav list. Clicking it expands 4 status folders; clicking a session opens it. The floating entry opens the full board. Press `Esc`, click outside the panel, or use its × to dismiss.
 
 ### Option 2 — CLI, from npm (recommended for scripted setups)
 
@@ -163,8 +167,8 @@ Configuration lives on the plugin row in `cordis.patch.yml`, and can also be edi
                                        │                         ▼    │
                                        │  sidebar.panellist → row click│
                                        │    └─ inline tree (navigation)│
-                                       │  shell.overlay    → bottom-   │
-                                       │    right pill → board + card  │
+                                       │  shell.overlay    → floating  │
+                                       │    entry (donut) → board+card │
                                        └──────────────────────────────┘
 ```
 
@@ -181,7 +185,7 @@ Three deliberate trade-offs:
 ```bash
 pnpm install
 pnpm typecheck   # tsc --noEmit, strict + exactOptionalPropertyTypes
-pnpm test        # vitest, 187 cases
+pnpm test        # vitest, 251 cases
 pnpm build       # clean → declarations → both halves → Client envelope wrap → self-check
 pnpm verify      # artefact self-check only (run pnpm build first)
 pnpm test:watch  # watch mode
@@ -204,14 +208,16 @@ dsh-plugin-status-board/
 │       ├── overlay.tsx          # row capture + inline tree portal + floating entry/board
 │       ├── fab-geometry.ts      # entry position record, clamping and panel placement (pure)
 │       ├── fab-drag.ts          # drag gesture state machine (threshold, capture, click suppression)
-│       ├── Tree.tsx             # the 3 status folders + session rows (navigation only)
+│       ├── StatusMark.tsx       # shared status-mark component (folders/rows, incl. green dot)
+│       ├── completion-unread.ts # reading, testing and counting the platform's unread state
+│       ├── Tree.tsx             # the 4 status folders + session rows (navigation only)
 │       ├── Panel.tsx            # floating board + decision-row card entry
 │       ├── QuestionCard.tsx     # L2 card (continued submits / open jumps)
 │       ├── store.ts             # external store (useSyncExternalStore)
 │       ├── session-source.ts    # runtime snapshot + userQuestions → classifier/card input
 │       └── styles.ts            # theme-token-driven styles
 ├── locale/{zh,en}.json          # UI copy + Plugin Manager metadata
-├── tests/                       # 187 unit tests
+├── tests/                       # 251 unit tests
 ├── scripts/                     # clean + Client envelope wrapper
 ├── cordis.patch.yml             # bundle patch (with default config)
 └── tsdown.config.mjs            # two independent builds (plain ESM; see its header)
@@ -225,8 +231,9 @@ dsh-plugin-status-board/
 | `config.test.ts` | defaults, clamping, wrong-type fallback |
 | `i18n.test.ts` | zh/en key parity, required-key validation, single-pass interpolation, relative time |
 | `session-source.test.ts` | snapshot adaptation, subagent/blank filtering, decision projection, question-payload narrowing, malformed rows |
+| `completion-unread.test.ts` | reading the platform status and tolerating its absence (missing field / unknown session / non-boolean all mean "not unread"), counting boundaries |
 | `store.test.ts` | subscriptions, change detection, collapse persistence, late config must not clobber a click |
-| `panel.test.tsx` | server-rendered: three boards, collapse, resolvable aria relations, loading/empty/error, theme tokens, card expand/submit |
+| `panel.test.tsx` | server-rendered: the four board sections (unread lift-out and counting included), collapse, resolvable aria relations, loading/empty/error, theme tokens, card expand/submit |
 | `fab-geometry.test.ts` | position parsing and tolerance, viewport clamping (including a window smaller than the entry), half-screen panel flip and edge avoidance, reset as key deletion rather than writing defaults |
 | `overlay.test.tsx` | floating-entry open/close, Escape and outside-press dismissal, focus in/out, drag-versus-click boundary, position persistence and reset, arrow-key nudging, decision badge, controller semantics |
 | `nav-entry.test.tsx` | row click capture, inline tree portal, navigation-only rows, 56px rail hiding, no-nav fallback, cleanup |
@@ -250,10 +257,13 @@ Team-task `pending` rows deliberately play no part: on disk a task row carries o
 Both the sidebar tree and the floating board navigate through the Harness `uiWorkspace.openSession` service. When that service is not part of the composition, rows render as static text rather than as buttons that do nothing.
 
 **Where is the collapse state stored?**
-Browser `localStorage` under `dsh-plugin-status-board.collapse.v1`. The three sidebar folders and the three board sections share this state; clear the key to fall back to the configured default. If storage is unavailable (private mode), the choice degrades to this page's lifetime automatically.
+Browser `localStorage` under `dsh-plugin-status-board.collapse.v1`. The sidebar folders and the three classifier sections share this state; clear the key to fall back to the configured default. If storage is unavailable (private mode), the choice degrades to this page's lifetime automatically. The floating entry's position lives under a separate key, `dsh-plugin-status-board.fab.v1`; both are user preference data.
+
+**Why did my "Completed unread" sessions vanish after a reload?**
+Deliberately. The completion-unread flag is maintained in memory by the platform: it is set when a run finishes and cleared when the session is opened, runs again, or the page reloads (a reload rebuilds the baseline from current running state and never replays past completions). The plugin reads exactly that state — the `useSessionStatus` standard slot prop — and stores nothing of its own. A private read-table would drift from the platform's own green dot, and with two boards side by side the mismatch would be visible at a glance.
 
 **What is left behind after uninstall?**
-Nothing. The styles are a `<style>` element inside the panel component, so unmounting removes them; the tree portal, the row click capture and its `MutationObserver` are released in the cleanup function; every slot registration and subscription is owned by a `ctx.effect`.
+Nothing in the DOM. The styles are a `<style>` element inside the panel component, so unmounting removes them; the tree portal, the row click capture and its `MutationObserver` are released in the cleanup function; every slot registration and subscription is owned by a `ctx.effect`. The two `localStorage` preference keys (collapse state, entry position) survive — they are user data, and uninstalling a plugin is not clearing browser storage.
 
 ---
 
