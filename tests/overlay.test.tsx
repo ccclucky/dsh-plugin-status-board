@@ -145,7 +145,7 @@ describe('BoardOverlay (entry ②)', () => {
     // The tooltip lists the four statuses with folder markers
     const marks = container.querySelectorAll('.status-board__fab .status-board-status')
     expect(marks).toHaveLength(4)
-    expect([...marks].map(m => m.getAttribute('data-bucket'))).toEqual(['decision', 'unread', 'executing', 'recent'])
+    expect([...marks].map(m => m.getAttribute('data-bucket'))).toEqual(['decision', 'executing', 'unread', 'recent'])
     expect([...marks].every(m => m.getAttribute('data-variant') === 'folder')).toBe(true)
 
     // The decision tally reflects the board, and its marker is not dimmed.
@@ -512,7 +512,7 @@ describe('floating entry: dragging versus clicking', () => {
     expect(container.querySelector('.status-board__fab-center')?.textContent).toBe('1')
 
     // Tooltip shows unread count = 1
-    const unreadCountEl = container.querySelectorAll('.status-board__fab-count')[1]
+    const unreadCountEl = container.querySelector('.status-board__fab-row[data-bucket="unread"] .status-board__fab-count')
     expect(unreadCountEl?.textContent).toBe('1')
     expect(unreadCountEl?.getAttribute('data-empty')).toBe('false')
 

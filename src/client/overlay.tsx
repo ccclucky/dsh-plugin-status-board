@@ -44,6 +44,7 @@ import {
   writeStoredFabPosition,
   type FabPosition,
   type FabPositionStorage,
+  type PanelPlacement,
 } from './fab-geometry.ts'
 import { DRAG_THRESHOLD, KEYBOARD_STEP, useFabDrag } from './fab-drag.ts'
 import {
@@ -116,8 +117,8 @@ export function describeCounts(
   return parts.join('，')
 }
 
-/** Circumference of the 44px SVG ring (r = 18). */
-export const DONUT_CIRCUMFERENCE = 113.097
+/** Circumference of the 44px SVG ring (r = 17). */
+export const DONUT_CIRCUMFERENCE = 106.814
 
 export interface DonutSegmentArc {
   readonly strokeDasharray: string
@@ -125,27 +126,27 @@ export interface DonutSegmentArc {
   readonly opacity: number
 }
 
-/** Compute stroke dasharray and offset for each of the 4 donut arcs. */
+/** Compute stroke dasharray and offset for each of the 4 donut arcs (clockwise: decision -> executing -> unread -> recent). */
 export function computeDonutArcs(counts: {
   readonly decision: number
-  readonly unread: number
   readonly executing: number
+  readonly unread: number
   readonly recent: number
-}): Record<'decision' | 'unread' | 'executing' | 'recent', DonutSegmentArc> {
-  const total = counts.decision + counts.unread + counts.executing + counts.recent
+}): Record<'decision' | 'executing' | 'unread' | 'recent', DonutSegmentArc> {
+  const total = counts.decision + counts.executing + counts.unread + counts.recent
   if (total === 0) {
     return {
-      decision: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
-      unread: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
-      executing: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
-      recent: { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 },
+      decision: { strokeDasharray: '0 106.81', strokeDashoffset: 0, opacity: 0 },
+      executing: { strokeDasharray: '0 106.81', strokeDashoffset: 0, opacity: 0 },
+      unread: { strokeDasharray: '0 106.81', strokeDashoffset: 0, opacity: 0 },
+      recent: { strokeDasharray: '0 106.81', strokeDashoffset: 0, opacity: 0 },
     }
   }
 
   let offset = 0
   const seg = (count: number): DonutSegmentArc => {
     if (count <= 0) {
-      return { strokeDasharray: '0 113.1', strokeDashoffset: 0, opacity: 0 }
+      return { strokeDasharray: '0 106.81', strokeDashoffset: 0, opacity: 0 }
     }
     const arc = (count / total) * DONUT_CIRCUMFERENCE
     const res: DonutSegmentArc = {
@@ -159,8 +160,8 @@ export function computeDonutArcs(counts: {
 
   return {
     decision: seg(counts.decision),
-    unread: seg(counts.unread),
     executing: seg(counts.executing),
+    unread: seg(counts.unread),
     recent: seg(counts.recent),
   }
 }
@@ -433,8 +434,8 @@ export function BoardOverlay({
 
   const donutArcs = computeDonutArcs({
     decision: counts.decision,
-    unread: unreadCount,
     executing: counts.executing,
+    unread: unreadCount,
     recent: recentCount,
   })
 
@@ -636,6 +637,48 @@ export function BoardOverlay({
     }
   }, [open])
 
+  // ── Hover Tooltip placement ───────────────────────────────────────────────
+  // Mirrored from the panel's geometry: if the button sits close to an edge,
+  // the tooltip is nudged or flipped rather than clipped by the viewport.
+  const [hovered, setHovered] = useState(false)
+  const [fabFocused, setFabFocused] = useState(false)
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const [tooltipPlacement, setTooltipPlacement] = useState<PanelPlacement | undefined>(undefined)
+
+  const showTooltip = !open && !drag.dragging
+  const tooltipVisible = (hovered || fabFocused) && showTooltip
+
+  useLayoutEffect(() => {
+    if (!showTooltip) {
+      setTooltipPlacement(undefined)
+      return
+    }
+    const updateTooltipPlacement = (): void => {
+      const box = fabBox()
+      const el = tooltipRef.current
+      const rect = el?.getBoundingClientRect()
+      const tooltipSize =
+        rect !== undefined && rect.width > 0
+          ? { width: rect.width, height: rect.height }
+          : { width: 175, height: 145 }
+
+      const next = resolvePanelPlacement(
+        { left: box.left, top: box.top, width: box.width, height: box.height },
+        tooltipSize,
+        viewport,
+        FAB_PANEL_GAP,
+        PANEL_EDGE_MARGIN,
+      )
+      setTooltipPlacement(prev =>
+        prev !== undefined && prev.left === next.left && prev.top === next.top && prev.opensUp === next.opensUp
+          ? prev
+          : next,
+      )
+    }
+
+    updateTooltipPlacement()
+  }, [showTooltip, viewport, fabBox, drawnPosition])
+
   const clamped = drawnPosition
   const fabStyle =
     clamped === undefined
@@ -655,6 +698,10 @@ export function BoardOverlay({
         aria-controls={open ? panelId : undefined}
         title={aria}
         data-dragging={drag.dragging ? 'true' : 'false'}
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        onFocus={() => setFabFocused(true)}
+        onBlur={() => setFabFocused(false)}
         onPointerDown={event => {
           notePress()
           drag.onPointerDown(event)
@@ -670,12 +717,12 @@ export function BoardOverlay({
         }}
       >
         <svg className="status-board__fab-svg" viewBox="0 0 44 44" aria-hidden="true">
-          <circle className="status-board__fab-track" cx="22" cy="22" r="18" />
+          <circle className="status-board__fab-track" cx="22" cy="22" r="17" />
           <circle
             className="status-board__fab-seg status-board__fab-seg--decision"
             cx="22"
             cy="22"
-            r="18"
+            r="17"
             style={{
               strokeDasharray: donutArcs.decision.strokeDasharray,
               strokeDashoffset: `${donutArcs.decision.strokeDashoffset}px`,
@@ -683,21 +730,10 @@ export function BoardOverlay({
             }}
           />
           <circle
-            className="status-board__fab-seg status-board__fab-seg--unread"
-            cx="22"
-            cy="22"
-            r="18"
-            style={{
-              strokeDasharray: donutArcs.unread.strokeDasharray,
-              strokeDashoffset: `${donutArcs.unread.strokeDashoffset}px`,
-              opacity: donutArcs.unread.opacity,
-            }}
-          />
-          <circle
             className="status-board__fab-seg status-board__fab-seg--executing"
             cx="22"
             cy="22"
-            r="18"
+            r="17"
             style={{
               strokeDasharray: donutArcs.executing.strokeDasharray,
               strokeDashoffset: `${donutArcs.executing.strokeDashoffset}px`,
@@ -705,10 +741,21 @@ export function BoardOverlay({
             }}
           />
           <circle
+            className="status-board__fab-seg status-board__fab-seg--unread"
+            cx="22"
+            cy="22"
+            r="17"
+            style={{
+              strokeDasharray: donutArcs.unread.strokeDasharray,
+              strokeDashoffset: `${donutArcs.unread.strokeDashoffset}px`,
+              opacity: donutArcs.unread.opacity,
+            }}
+          />
+          <circle
             className="status-board__fab-seg status-board__fab-seg--recent"
             cx="22"
             cy="22"
-            r="18"
+            r="17"
             style={{
               strokeDasharray: donutArcs.recent.strokeDasharray,
               strokeDashoffset: `${donutArcs.recent.strokeDashoffset}px`,
@@ -720,51 +767,74 @@ export function BoardOverlay({
           {centerText}
         </span>
 
-        {/* Hover Tooltip breakdown */}
-        <div className="status-board__fab-tooltip" role="tooltip" aria-hidden="true">
-          <div className="status-board__fab-tooltip-head">
-            <span>{translate('panel.shortTitle')}</span>
-            <span>{translate('summary.total', { total })}</span>
+        {/* Hover Tooltip breakdown: dynamically positioned and edge-clamped */}
+        {showTooltip ? (
+          <div
+            ref={tooltipRef}
+            className="status-board__fab-tooltip"
+            style={
+              tooltipPlacement === undefined
+                ? { position: 'fixed', opacity: 0, visibility: 'hidden', pointerEvents: 'none' }
+                : {
+                    position: 'fixed',
+                    left: `${tooltipPlacement.left}px`,
+                    top: `${tooltipPlacement.top}px`,
+                    right: 'auto',
+                    bottom: 'auto',
+                    opacity: tooltipVisible ? 1 : 0,
+                    visibility: tooltipVisible ? 'visible' : 'hidden',
+                    pointerEvents: tooltipVisible ? 'auto' : 'none',
+                  }
+            }
+            data-placement={tooltipPlacement?.opensUp === true ? 'top' : 'bottom'}
+            data-visible={tooltipVisible ? 'true' : 'false'}
+            role="tooltip"
+            aria-hidden={!tooltipVisible}
+          >
+            <div className="status-board__fab-tooltip-head">
+              <span>{translate('panel.shortTitle')}</span>
+              <span>{translate('summary.total', { total })}</span>
+            </div>
+            <div className="status-board__fab-tooltip-list">
+              <div className="status-board__fab-row" data-bucket="decision">
+                <span className="status-board__fab-group">
+                  <StatusMark bucket="decision" variant="folder" empty={counts.decision === 0} />
+                  <span>{translate('bucket.decision')}</span>
+                </span>
+                <span className="status-board__fab-count" data-empty={counts.decision === 0}>
+                  {counts.decision}
+                </span>
+              </div>
+              <div className="status-board__fab-row" data-bucket="executing">
+                <span className="status-board__fab-group">
+                  <StatusMark bucket="executing" variant="folder" empty={counts.executing === 0} />
+                  <span>{translate('bucket.executing')}</span>
+                </span>
+                <span className="status-board__fab-count" data-empty={counts.executing === 0}>
+                  {counts.executing}
+                </span>
+              </div>
+              <div className="status-board__fab-row" data-bucket="unread">
+                <span className="status-board__fab-group">
+                  <StatusMark bucket="unread" variant="folder" empty={unreadCount === 0} />
+                  <span>{translate('bucket.unread')}</span>
+                </span>
+                <span className="status-board__fab-count" data-empty={unreadCount === 0}>
+                  {unreadCount}
+                </span>
+              </div>
+              <div className="status-board__fab-row" data-bucket="recent">
+                <span className="status-board__fab-group">
+                  <StatusMark bucket="recent" variant="folder" empty={recentCount === 0} />
+                  <span>{translate('bucket.recent')}</span>
+                </span>
+                <span className="status-board__fab-count" data-empty={recentCount === 0}>
+                  {recentCount}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="status-board__fab-tooltip-list">
-            <div className="status-board__fab-row">
-              <span className="status-board__fab-group">
-                <StatusMark bucket="decision" variant="folder" empty={counts.decision === 0} />
-                <span>{translate('bucket.decision')}</span>
-              </span>
-              <span className="status-board__fab-count" data-empty={counts.decision === 0}>
-                {counts.decision}
-              </span>
-            </div>
-            <div className="status-board__fab-row">
-              <span className="status-board__fab-group">
-                <StatusMark bucket="unread" variant="folder" empty={unreadCount === 0} />
-                <span>{translate('bucket.unread')}</span>
-              </span>
-              <span className="status-board__fab-count" data-empty={unreadCount === 0}>
-                {unreadCount}
-              </span>
-            </div>
-            <div className="status-board__fab-row">
-              <span className="status-board__fab-group">
-                <StatusMark bucket="executing" variant="folder" empty={counts.executing === 0} />
-                <span>{translate('bucket.executing')}</span>
-              </span>
-              <span className="status-board__fab-count" data-empty={counts.executing === 0}>
-                {counts.executing}
-              </span>
-            </div>
-            <div className="status-board__fab-row">
-              <span className="status-board__fab-group">
-                <StatusMark bucket="recent" variant="folder" empty={recentCount === 0} />
-                <span>{translate('bucket.recent')}</span>
-              </span>
-              <span className="status-board__fab-count" data-empty={recentCount === 0}>
-                {recentCount}
-              </span>
-            </div>
-          </div>
-        </div>
+        ) : null}
       </button>
       {open ? (
         <div

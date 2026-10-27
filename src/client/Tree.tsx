@@ -112,9 +112,8 @@ function TreeFolder({
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   const statuses = useUnreadStatuses()
   const board = state.board.buckets.find(candidate => candidate.id === id)
-  const entries = entriesOverride ?? board?.entries
-  if (entries === undefined) return null
-  if (id === 'unread' && entries.length === 0) return null
+  const entries = entriesOverride ?? board?.entries ?? []
+  if (id !== 'unread' && board?.entries === undefined && entriesOverride === undefined) return null
 
   const [unreadCollapsed, setUnreadCollapsed] = useState(false)
   const collapsed = id === 'unread' ? unreadCollapsed : isCollapsed(state.collapse, id)
@@ -218,17 +217,15 @@ export function StatusTree({ store, onOpenSession }: TreeProps): ReactElement {
         </p>
       ) : null}
       <TreeFolder id="decision" store={store} translate={translate} now={now} onOpenSession={onOpenSession} />
-      {unreadEntries.length > 0 ? (
-        <TreeFolder
-          id="unread"
-          store={store}
-          translate={translate}
-          now={now}
-          onOpenSession={onOpenSession}
-          entriesOverride={unreadEntries}
-        />
-      ) : null}
       <TreeFolder id="executing" store={store} translate={translate} now={now} onOpenSession={onOpenSession} />
+      <TreeFolder
+        id="unread"
+        store={store}
+        translate={translate}
+        now={now}
+        onOpenSession={onOpenSession}
+        entriesOverride={unreadEntries}
+      />
       <TreeFolder
         id="recent"
         store={store}

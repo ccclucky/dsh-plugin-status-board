@@ -129,7 +129,7 @@ describe('BoardNavEntry (entry ①)', () => {
     const portal = nav.querySelector<HTMLElement>('[data-status-board-tree]')
     expect(portal).not.toBeNull()
     expect(portal?.hidden).toBe(false)
-    expect(portal?.querySelectorAll('.status-board-tree__toggle')).toHaveLength(3)
+    expect(portal?.querySelectorAll('.status-board-tree__toggle')).toHaveLength(4)
     // The tree is navigation only: no answer/approval controls.
     expect(portal?.querySelector('.status-board__answer-toggle')).toBeNull()
     expect(portal?.textContent).toContain('Needs my decision')

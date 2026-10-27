@@ -1196,30 +1196,27 @@ button.status-board-tree__row:hover {
   height: 44px;
   min-width: 44px;
   padding: 0;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-tertiary) 35%, transparent);
   border-radius: 50%;
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  font-weight: 700;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 94%, transparent);
+  color: var(--dsw-alias-brand-primary-invert);
   box-shadow:
-    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
-    0 8px 20px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
+    0 2px 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, transparent),
+    0 8px 24px color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, transparent);
   cursor: grab;
   pointer-events: auto;
   /* The button owns the gesture: without this a touch drag scrolls the
      conversation behind it instead of moving the entry. */
   touch-action: none;
   user-select: none;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 100ms ease;
+  transition: transform 140ms ease, box-shadow 140ms ease;
 }
 
 .status-board__fab:hover {
-  background: var(--dsw-alias-bg-layer-2);
-  transform: scale(1.05);
+  transform: scale(1.06);
   box-shadow:
-    0 2px 4px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
-    0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+    0 4px 8px color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent),
+    0 12px 28px color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, transparent);
 }
 
 .status-board__fab:focus-visible {
@@ -1233,11 +1230,11 @@ button.status-board-tree__row:hover {
   cursor: grabbing;
   transform: scale(1.08);
   border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--dsw-alias-brand-primary) 50%, transparent);
 }
 
 .status-board__fab--dragging:hover {
-  background: var(--dsw-alias-bg-layer-1);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 94%, transparent);
 }
 
 /* ── Donut Ring SVG ──────────────────────────────────────────────────────── */
@@ -1254,13 +1251,14 @@ button.status-board-tree__row:hover {
 
 .status-board__fab-track {
   fill: none;
-  stroke: color-mix(in srgb, var(--dsw-alias-border-l1) 60%, transparent);
+  stroke: color-mix(in srgb, var(--dsw-alias-label-tertiary) 45%, transparent);
   stroke-width: 3.5;
 }
 
 .status-board__fab-seg {
   fill: none;
   stroke-width: 3.5;
+  stroke-linecap: round;
   transition: stroke-dasharray 280ms ease, stroke-dashoffset 280ms ease, opacity 200ms ease;
 }
 
@@ -1268,70 +1266,47 @@ button.status-board-tree__row:hover {
   stroke: var(--dsw-alias-state-warn-label);
 }
 
-.status-board__fab-seg--unread {
-  stroke: var(--dsw-alias-state-success-primary);
-}
-
 .status-board__fab-seg--executing {
   stroke: var(--dsw-alias-state-business-primary);
 }
 
+.status-board__fab-seg--unread {
+  stroke: var(--dsw-alias-state-success-primary);
+}
+
 .status-board__fab-seg--recent {
-  stroke: var(--dsw-alias-label-tertiary);
+  stroke: color-mix(in srgb, var(--dsw-alias-label-secondary) 85%, transparent);
 }
 
 .status-board__fab-center {
   position: relative;
   z-index: 2;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 750;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-brand-primary-invert);
 }
 
 /* ── Hover Tooltip ───────────────────────────────────────────────────────── */
 
 .status-board__fab-tooltip {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  position: fixed;
   z-index: 70;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 160px;
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
+  min-width: 175px;
+  padding: 9px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
   background: var(--dsw-alias-bg-layer-1);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+  color: var(--dsw-alias-label-primary);
+  box-shadow:
+    0 4px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 12px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
-}
-
-.status-board__fab-tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 5px;
-  border-style: solid;
-  border-color: var(--dsw-alias-bg-layer-1) transparent transparent transparent;
-}
-
-.status-board__fab:hover .status-board__fab-tooltip,
-.status-board__fab:focus-visible .status-board__fab-tooltip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
-
-.status-board__fab--dragging .status-board__fab-tooltip {
-  display: none;
+  transition: opacity 140ms ease;
 }
 
 .status-board__fab-tooltip-head {

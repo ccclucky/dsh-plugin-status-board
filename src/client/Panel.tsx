@@ -243,9 +243,8 @@ function Bucket({
   readonly entriesOverride?: readonly BoardEntry[] | undefined
 }): ReactElement | null {
   const board = state.board.buckets.find(candidate => candidate.id === id)
-  const entries = entriesOverride ?? board?.entries
-  if (entries === undefined) return null
-  if (id === 'unread' && entries.length === 0) return null
+  const entries = entriesOverride ?? board?.entries ?? []
+  if (id !== 'unread' && board?.entries === undefined && entriesOverride === undefined) return null
 
   // One `useId` per board keeps DOM ids unique when the sidebar is torn down and
   // remounted (or two windows are open).
@@ -428,20 +427,6 @@ function BoardPanelBody({
           onOpenSession={onOpenSession}
           answerQuestion={answerQuestion}
         />
-        {unreadEntries.length > 0 ? (
-          <Bucket
-            key="unread"
-            id="unread"
-            state={state}
-            store={store}
-            translate={translate}
-            now={now}
-            query={query}
-            onOpenSession={onOpenSession}
-            answerQuestion={answerQuestion}
-            entriesOverride={unreadEntries}
-          />
-        ) : null}
         <Bucket
           key="executing"
           id="executing"
@@ -452,6 +437,18 @@ function BoardPanelBody({
           query={query}
           onOpenSession={onOpenSession}
           answerQuestion={answerQuestion}
+        />
+        <Bucket
+          key="unread"
+          id="unread"
+          state={state}
+          store={store}
+          translate={translate}
+          now={now}
+          query={query}
+          onOpenSession={onOpenSession}
+          answerQuestion={answerQuestion}
+          entriesOverride={unreadEntries}
         />
         <Bucket
           key="recent"
