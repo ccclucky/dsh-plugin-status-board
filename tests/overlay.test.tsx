@@ -135,30 +135,32 @@ describe('BoardOverlay (entry ②)', () => {
     expect(container.querySelector('style')).not.toBeNull()
   })
 
-  it('shows one marker per board with its tally, using the tree\u2019s own marker component', () => {
+  it('shows the segmented donut ring and status tooltip with markers and tallies', () => {
     const { container } = mount(makeStore([signal('d', { awaitingDecision: true })]))
-    // The entry must speak the same shape language as the sidebar tree: three
-    // directory-variant markers, not a single ad-hoc badge.
+    // The entry renders a circular segmented donut with central text and tooltip.
+    expect(container.querySelector('.status-board__fab-svg')).not.toBeNull()
+    expect(container.querySelector('.status-board__fab-center')?.textContent).toBe('1')
+    expect(container.querySelector('.status-board__fab-tooltip')).not.toBeNull()
+
+    // The tooltip lists the four statuses with folder markers
     const marks = container.querySelectorAll('.status-board__fab .status-board-status')
-    expect(marks).toHaveLength(3)
-    expect([...marks].map(m => m.getAttribute('data-bucket'))).toEqual(['decision', 'executing', 'recent'])
+    expect(marks).toHaveLength(4)
+    expect([...marks].map(m => m.getAttribute('data-bucket'))).toEqual(['decision', 'unread', 'executing', 'recent'])
     expect([...marks].every(m => m.getAttribute('data-variant') === 'folder')).toBe(true)
 
     // The decision tally reflects the board, and its marker is not dimmed.
     const counts = [...container.querySelectorAll('.status-board__fab-count')]
-    expect(counts.map(c => c.textContent)).toEqual(['1', '0', '0'])
+    expect(counts.map(c => c.textContent)).toEqual(['1', '0', '0', '0'])
     expect(counts[0]?.getAttribute('data-empty')).toBe('false')
-    // A zero keeps its marker but is marked empty, exactly like the tree does.
+    // Zeros keep their markers but are marked empty, matching the tree.
     expect(counts[1]?.getAttribute('data-empty')).toBe('true')
     expect(marks[1]?.getAttribute('data-empty')).toBe('true')
     expect(container.querySelector('.status-board__fab')?.getAttribute('aria-label')).toContain('Needs my decision 1')
   })
 
-  it('keeps all three boards visible even when a board is empty', () => {
-    // Hiding empty groups would make the button width jump with the data and would
-    // hide the single most reassuring answer ("nothing is waiting on me").
+  it('keeps all four statuses visible in the tooltip even when empty', () => {
     const { container } = mount(makeStore([]))
-    expect(container.querySelectorAll('.status-board__fab-group')).toHaveLength(3)
+    expect(container.querySelectorAll('.status-board__fab-group')).toHaveLength(4)
   })
 
   it('offers a reset control that is disabled until the entry has been moved', () => {
@@ -486,5 +488,36 @@ describe('floating entry: dragging versus clicking', () => {
 
     expect(controller.getSnapshot()).toBe(false)
     expect(fab.style.left).toBe('')
+  })
+
+  it('renders unread arc in donut ring and updates center urgent count', () => {
+    const store = makeStore([signal('r1', {}), signal('r2', {})])
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    const statusMap = new Map([['r1', { completionUnread: true }]])
+    act(() => {
+      root.render(
+        createElement(BoardOverlay, {
+          controller: createOverlayController(),
+          store,
+          resolveNavigation: () => undefined,
+          useSessionStatus: () => statusMap,
+        }),
+      )
+    })
+    mounted.push({ root, container })
+
+    // Center text displays 1 (urgent: 0 decision + 1 unread = 1)
+    expect(container.querySelector('.status-board__fab-center')?.textContent).toBe('1')
+
+    // Tooltip shows unread count = 1
+    const unreadCountEl = container.querySelectorAll('.status-board__fab-count')[1]
+    expect(unreadCountEl?.textContent).toBe('1')
+    expect(unreadCountEl?.getAttribute('data-empty')).toBe('false')
+
+    // Unread segment in donut svg has opacity = 1
+    const unreadSeg = container.querySelector('.status-board__fab-seg--unread')
+    expect(unreadSeg?.getAttribute('style')).toContain('opacity: 1')
   })
 })

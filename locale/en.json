@@ -23,6 +23,10 @@
     "recentUnit": "recent",
     "decisionEmpty": "Nothing waiting on you",
     "executingEmpty": "Nothing running",
+    "unread": "Completed unread",
+    "unreadHint": "These sessions finished running while you were away",
+    "unreadEmpty": "No unread completed sessions",
+    "unreadUnit": "completed unread",
     "unopened": "unopened",
     "recentEmpty": "No recent activity",
     "recentHintDays": "Active in the last {days} days"

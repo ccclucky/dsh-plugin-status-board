@@ -493,6 +493,10 @@ button.status-board__row:active {
   --sb-status: var(--dsw-alias-state-warn-label);
 }
 
+.status-board-status[data-bucket="unread"] {
+  --sb-status: var(--dsw-alias-state-success-primary);
+}
+
 .status-board-status[data-bucket="executing"] {
   --sb-status: var(--dsw-alias-state-business-primary);
 }
@@ -549,6 +553,26 @@ button.status-board__row:active {
   border: 1.5px solid var(--sb-status-soft);
   border-top-color: var(--sb-status);
   animation: status-board-status-pulse 1.8s ease-in-out infinite;
+}
+
+/* Unread: a solid green core with a soft halo (directory), or a hollow green ring (session). */
+.status-board-status[data-bucket="unread"][data-variant="folder"]::before {
+  width: 8px;
+  height: 8px;
+  background: var(--sb-status);
+}
+
+.status-board-status[data-bucket="unread"][data-variant="folder"]::after {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--sb-status-soft);
+}
+
+.status-board-status[data-bucket="unread"][data-variant="row"]::before {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--sb-status);
+  background: transparent;
 }
 
 /* Recent: a static dot with a faint ring (directory), a static hollow ring
@@ -1167,18 +1191,17 @@ button.status-board-tree__row:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   box-sizing: border-box;
-  min-width: 38px;
-  height: 34px;
-  padding: 0 12px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  font-weight: 700;
   box-shadow:
     0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
     0 8px 20px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
@@ -1188,10 +1211,15 @@ button.status-board-tree__row:hover {
      conversation behind it instead of moving the entry. */
   touch-action: none;
   user-select: none;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 100ms ease;
 }
 
 .status-board__fab:hover {
   background: var(--dsw-alias-bg-layer-2);
+  transform: scale(1.05);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
 }
 
 .status-board__fab:focus-visible {
@@ -1203,6 +1231,7 @@ button.status-board-tree__row:hover {
    repaint would flicker; the lifted shadow is what makes the move read as real. */
 .status-board__fab--dragging {
   cursor: grabbing;
+  transform: scale(1.08);
   border-color: var(--dsw-alias-state-business-primary);
   box-shadow: 0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
 }
@@ -1211,13 +1240,129 @@ button.status-board-tree__row:hover {
   background: var(--dsw-alias-bg-layer-1);
 }
 
-/* One board marker plus its tally. The marker is the shared StatusMark in its
-   directory variant - the same component the tree puts before each section - so
-   the entry cannot drift away from the tree's shape language. */
+/* ── Donut Ring SVG ──────────────────────────────────────────────────────── */
+
+.status-board__fab-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.status-board__fab-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--dsw-alias-border-l1) 60%, transparent);
+  stroke-width: 3.5;
+}
+
+.status-board__fab-seg {
+  fill: none;
+  stroke-width: 3.5;
+  transition: stroke-dasharray 280ms ease, stroke-dashoffset 280ms ease, opacity 200ms ease;
+}
+
+.status-board__fab-seg--decision {
+  stroke: var(--dsw-alias-state-warn-label);
+}
+
+.status-board__fab-seg--unread {
+  stroke: var(--dsw-alias-state-success-primary);
+}
+
+.status-board__fab-seg--executing {
+  stroke: var(--dsw-alias-state-business-primary);
+}
+
+.status-board__fab-seg--recent {
+  stroke: var(--dsw-alias-label-tertiary);
+}
+
+.status-board__fab-center {
+  position: relative;
+  z-index: 2;
+  font-size: 12.5px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Hover Tooltip ───────────────────────────────────────────────────────── */
+
+.status-board__fab-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 160ms ease, transform 160ms ease, visibility 160ms;
+}
+
+.status-board__fab-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--dsw-alias-bg-layer-1) transparent transparent transparent;
+}
+
+.status-board__fab:hover .status-board__fab-tooltip,
+.status-board__fab:focus-visible .status-board__fab-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.status-board__fab--dragging .status-board__fab-tooltip {
+  display: none;
+}
+
+.status-board__fab-tooltip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.status-board__fab-tooltip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .status-board__fab-group {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.status-board__fab-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
 }
 
 .status-board__fab-count {
@@ -1230,6 +1375,7 @@ button.status-board-tree__row:hover {
 /* A zero keeps its place but recedes, matching the dimmed marker beside it. */
 .status-board__fab-count[data-empty="true"] {
   color: var(--dsw-alias-label-secondary);
+  opacity: 0.55;
 }
 
 /* The panel carries no anchor of its own: the plugin places it from the entry's
@@ -1300,15 +1446,6 @@ button.status-board-tree__row:hover {
   .status-board__fab {
     right: 12px;
     bottom: 88px;
-    gap: 7px;
-    padding: 0 9px;
-  }
-
-  /* On a narrow viewport the tallies go and the markers stay: the numbers are the
-     precision, the markers are "which boards have anything in them", and a glance
-     wants the second. */
-  .status-board__fab-count {
-    display: none;
   }
 
   .status-board__overlay--fab {
