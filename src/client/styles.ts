@@ -1196,13 +1196,13 @@ button.status-board-tree__row:hover {
   height: 44px;
   min-width: 44px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-tertiary) 35%, transparent);
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 94%, transparent);
-  color: var(--dsw-alias-brand-primary-invert);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
   box-shadow:
-    0 2px 4px color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, transparent),
-    0 8px 24px color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, transparent);
+    0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
   cursor: grab;
   pointer-events: auto;
   /* The button owns the gesture: without this a touch drag scrolls the
@@ -1213,10 +1213,11 @@ button.status-board-tree__row:hover {
 }
 
 .status-board__fab:hover {
+  background: var(--dsw-alias-bg-layer-2);
   transform: scale(1.06);
   box-shadow:
-    0 4px 8px color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent),
-    0 12px 28px color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, transparent);
+    0 4px 10px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
+    0 12px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
 }
 
 .status-board__fab:focus-visible {
@@ -1230,11 +1231,11 @@ button.status-board-tree__row:hover {
   cursor: grabbing;
   transform: scale(1.08);
   border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--dsw-alias-brand-primary) 50%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
 }
 
 .status-board__fab--dragging:hover {
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 94%, transparent);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 /* ── Donut Ring SVG ──────────────────────────────────────────────────────── */
@@ -1251,8 +1252,14 @@ button.status-board-tree__row:hover {
 
 .status-board__fab-track {
   fill: none;
-  stroke: color-mix(in srgb, var(--dsw-alias-label-tertiary) 45%, transparent);
+  stroke: color-mix(in srgb, var(--dsw-alias-border-l2) 70%, transparent);
   stroke-width: 3.5;
+}
+
+.status-board__fab-inner-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--dsw-alias-border-l1) 80%, transparent);
+  stroke-width: 1;
 }
 
 .status-board__fab-seg {
@@ -1285,7 +1292,7 @@ button.status-board-tree__row:hover {
   font-weight: 750;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-brand-primary-invert);
+  color: var(--dsw-alias-label-primary);
 }
 
 /* ── Hover Tooltip ───────────────────────────────────────────────────────── */

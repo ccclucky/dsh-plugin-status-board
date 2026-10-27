@@ -271,7 +271,7 @@ function Bucket({
   // and this board has nothing to say about it.
   if (filtering && count === 0) return null
   // An empty board is hidden when the operator turned headers off.
-  if (!filtering && count === 0 && (id === 'unread' || !state.config.showEmptyBuckets)) return null
+  if (!filtering && count === 0 && !state.config.showEmptyBuckets) return null
 
   // While the list is still being enumerated, "no sessions" is not a fact yet.
   const loading = state.status === 'loading' && count === 0
