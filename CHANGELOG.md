@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] — 2026-10-28
 
 ### Added
 
@@ -16,8 +16,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Dedicated completion unread board section.** Sessions with unopened completions are
   promoted into an independent "Completed unread" section in both the popover panel and
   the sidebar tree rather than being buried in recent records, keeping the inside boards
-  in 100% parity with the four-segment floating ring. The section disappears when all
-  completions are viewed.
+  in 100% parity with the four-segment floating ring. The section is permanently retained in
+  both places to maintain consistent navigation hierarchy.
 - **A completion reminder on session rows.** A session that finished a run, is not the one
   on screen, and has not been opened since now carries a small green dot on its status
   marker. The state is the platform's own `completionUnread`, read through the
@@ -35,6 +35,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The reminder dot first sat on top of the status ring, so the row read as a ring with a
   bite taken out. Caught by looking at a 4× capture, where the two variants differ even
   though they are identical at 1×; the dot now sits on the ring's shoulder.
+- **Hover jitter caused by containing-block transforms.** Tooltips inside `<button>` inherited
+  the button's hover scale transform as a containing block, throwing fixed viewport
+  coordinates offscreen. Tooltip popovers now render outside the button with bidirectional
+  pointer tracking and smart edge clamping.
 
 ## [0.4.0] — 2026-10-27
 
