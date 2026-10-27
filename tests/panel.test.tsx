@@ -109,11 +109,11 @@ describe('completion reminder', () => {
     expect(markup).toContain('Completed unread')
   })
 
-  it('leaves a plainly-seen row in recent without an unread board', async () => {
+  it('leaves a plainly-seen row in recent with an empty unread board', async () => {
     const store = await storeFor([row('r', 'seen already')])
     const markup = withStatuses(store, new Map([['r', { completionUnread: false }]]))
     expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
-    expect(markup).not.toMatch(/data-bucket="unread"/)
+    expect(markup).toMatch(/data-bucket="unread"/)
   })
 
   it('renders every row when the platform provides no status hook at all', async () => {
@@ -122,7 +122,7 @@ describe('completion reminder', () => {
     const store = await storeFor([row('r', 'no hook here')])
     const markup = renderToStaticMarkup(createElement(BoardPanel, { store }))
     expect(markup).toContain('no hook here')
-    expect(markup).not.toMatch(/data-bucket="unread"/)
+    expect(markup).toMatch(/data-bucket="unread"/)
     expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
   })
 
@@ -241,9 +241,9 @@ describe('BoardPanel', () => {
 
   it('exposes a disclosure button with a resolvable aria-controls on each board', async () => {
     const markup = await render([])
-    expect(markup.match(/aria-expanded=/g)).toHaveLength(3)
+    expect(markup.match(/aria-expanded=/g)).toHaveLength(4)
     const controlled = [...markup.matchAll(/aria-controls="([^"]+)"/g)].map(match => match[1])
-    expect(controlled).toHaveLength(3)
+    expect(controlled).toHaveLength(4)
     // Every IDREF must resolve to an element that is actually in the document.
     for (const id of controlled) {
       expect(markup).toContain(`id="${String(id)}"`)
@@ -260,9 +260,9 @@ describe('BoardPanel', () => {
 
   it('wraps each toggle in a real heading instead of a role inside a button', async () => {
     const markup = await render([])
-    // Three board headers plus the module title: the module is a sidebar block,
+    // Four board headers plus the module title: the module is a sidebar block,
     // so its own title is an h2 rather than the h1 a full page would use.
-    expect(markup.match(/<h2/g)).toHaveLength(4)
+    expect(markup.match(/<h2/g)).toHaveLength(5)
     // The broken pattern this replaces: a `role="heading"` span nested in the
     // button subtree, which the accessibility tree would discard.
     expect(markup).not.toContain('role="heading"')
@@ -303,8 +303,8 @@ describe('BoardPanel', () => {
 
     const withoutAction = await render(rows)
     expect(withoutAction).not.toContain('aria-label="Act on me"')
-    // Only the three board toggles remain as buttons.
-    expect(withoutAction.match(/<button/g)?.length).toBe(3)
+    // Only the four board toggles remain as buttons.
+    expect(withoutAction.match(/<button/g)?.length).toBe(4)
   })
 
   it('wires the row click to the navigation seam with the session id', () => {
@@ -439,10 +439,10 @@ describe('BoardPanel', () => {
   it('renders the three boards as labelled groups inside the sidebar module', async () => {
     const markup = await render([])
     // The module lives inside the sidebar, which is already a landmark, so it
-    // claims no landmark of its own; its three boards are groups.
+    // claims no landmark of its own; its four boards are groups.
     expect(markup).not.toContain('role="region"')
     expect(markup).toContain('aria-labelledby="status-board-title-')
-    expect(markup.match(/role="group"/g)).toHaveLength(3)
+    expect(markup.match(/role="group"/g)).toHaveLength(4)
   })
 
   it('renders a total-session summary', async () => {
@@ -458,7 +458,7 @@ describe('BoardPanel', () => {
 
   it('hides an empty board when the operator turned headers off', async () => {
     const cards = (markup: string): number => markup.match(/class="status-board__card"/g)?.length ?? 0
-    expect(cards(await render([]))).toBe(3)
+    expect(cards(await render([]))).toBe(4)
     const withoutHeaders = await render([], {
       config: { ...DEFAULTS, showEmptyBuckets: false, defaultCollapsed: 'none' },
     })
