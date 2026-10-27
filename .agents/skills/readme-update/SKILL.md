@@ -23,8 +23,8 @@ description: 更新本项目的 README 文字与截图（发版后、UI 改版�
 按顺序更新：
 
 1. 开头：它是什么、解决什么问题。
-2. 状态表：待我决策 / 正在执行 / 近期记录 的判定规则。
-3. 功能：两个入口（侧栏目录树、右下角胶囊）、纯导航、状态动效、浮窗题卡、实时/折叠/双语/主题/无障碍。
+2. 状态表：三个排他判定栏（待我决策 / 正在执行 / 近期记录）+ 常驻「完成未看」；完成未看由平台 `completionUnread` 提升而来，不参与判定，未读绿点叠加在行上。
+3. 功能：两个入口（侧栏四状态目录、悬浮环形分段按钮）、纯导航、状态动效、完成未看/绿点、浮窗题卡、拖动、实时/折叠/双语/主题/无障碍。
 4. 安装：Plugin Manager、CLI、本地目录、源码构建。
 5. 配置：默认值必须核对 `src/shared/config.ts` 与 `cordis.patch.yml`。当前默认是 `recentWindowHours: 168`（7 天）、`maxRecent: 20`、`defaultCollapsed: recent`、`showEmptyBuckets: true`——仍要现场核对，不照抄旧 README。
 6. FAQ 与边界：点击会话、折叠记忆、7 天窗口、数量上限、卸载残留。
@@ -44,11 +44,13 @@ description: 更新本项目的 README 文字与截图（发版后、UI 改版�
 
 | 文件 | 内容 | 规格 |
 | :--- | :--- | :--- |
-| `docs/demo/light-tree.png` | 浅色：目录树展开 + 右下角胶囊 | 1440×900 |
+| `docs/demo/light-tree.png` | 浅色：四状态目录 + 环形分段悬浮按钮 | 1440×900 |
 | `docs/demo/light-board.png` | 浅色：目录树 + 浮窗看板 | 1440×900 |
 | `docs/demo/dark-board.png` | 深色：同一视图 | 1440×900 |
 | `docs/demo/light-card.png` | 决策题卡（演示数据） | 1280×800 |
 | `docs/demo/demo-collapse.gif` | 展开 → 打开 → 收起 | 960×600，≤3 MB |
+
+当前 0.5.0 的入口形态：44px **环形分段按钮**（四段按状态计数着色，中心显示最要紧数字；可拖动并记忆位置），不是旧的「胶囊」。只要入口形态或状态数量变了，**浅色、深色、题卡、GIF 全部重拍**，不要复用旧 pill 截图。
 
 原则：
 
@@ -129,7 +131,7 @@ https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/dem
   <img src="<raw>/light-board.png" alt="侧栏目录树与浮窗看板" width="820">
 </p>
 
-| 目录树 + 胶囊 | 浮窗决策题卡（演示数据） |
+| 目录树 + 环形按钮 | 浮窗决策题卡（演示数据） |
 | :---: | :---: |
 | ![目录树](<raw>/light-tree.png) | ![决策题卡](<raw>/light-card.png) |
 
@@ -150,6 +152,7 @@ https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/dem
 - [ ] GIF ≤3 MB，帧序能读懂。
 - [ ] 无头像/昵称/私密信息；题卡标注演示数据。
 - [ ] README 默认值、命令、功能与代码一致；中英同步。
+- [ ] 四个目录、环形分段、可拖动、完成未看/绿点与当前 UI 一致；深色/GIF 不是旧入口。
 - [ ] 新页面无 console error；浅色/深色都看。
 - [ ] 提交、推送、CI 绿；纯文档不改版本、不擅自发布。
 - [ ] 若要 npm 页面同步，说明需要 patch 版本。
@@ -164,6 +167,7 @@ https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/dem
 - 只改中文或只改文字。
 - 把「CI 绿」当成 npm README 已更新。
 - 为更新 README 擅自发版。
+- 入口形态/状态数量已变，仍复用旧的浅色、深色或 GIF 素材。
 
 ---
 
