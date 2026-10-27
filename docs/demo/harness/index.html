@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DSH 演示宿主 · 会话状态看板</title>
+<script src="./page.js"></script>
+<style>
+  /* Host theme tokens, in two palettes. These belong to the demo page, not to
+     the shipped stylesheet, so raw colours are fine here. */
+  :root, html[data-theme="light"] {
+    --dsw-alias-bg-layer-1: #ffffff;
+    --dsw-alias-bg-layer-2: #f6f6f7;
+    --dsw-alias-border-l1: #e4e4e7;
+    --dsw-alias-border-l2: #ececef;
+    --dsw-alias-interactive-bg-hover: #ececef;
+    --dsw-alias-label-primary: #18181b;
+    --dsw-alias-label-primary-foreground: #ffffff;
+    --dsw-alias-label-secondary: #52525b;
+    --dsw-alias-label-tertiary: #a1a1aa;
+    --dsw-alias-state-business-primary: #2563eb;
+    --dsw-alias-state-error-primary: #dc2626;
+    --dsw-alias-state-success-primary: #16a34a;
+    --dsw-alias-state-warn-primary: #d97706;
+    --dsw-alias-state-warn-label: #92400e;
+  }
+  html[data-theme="dark"] {
+    --dsw-alias-bg-layer-1: #17171a;
+    --dsw-alias-bg-layer-2: #1f1f23;
+    --dsw-alias-border-l1: #2e2e33;
+    --dsw-alias-border-l2: #3a3a40;
+    --dsw-alias-interactive-bg-hover: #2a2a30;
+    --dsw-alias-label-primary: #f4f4f5;
+    --dsw-alias-label-primary-foreground: #18181b;
+    --dsw-alias-label-secondary: #a1a1aa;
+    --dsw-alias-label-tertiary: #71717a;
+    --dsw-alias-state-business-primary: #3b82f6;
+    --dsw-alias-state-error-primary: #ef4444;
+    --dsw-alias-state-success-primary: #22c55e;
+    --dsw-alias-state-warn-primary: #f59e0b;
+    --dsw-alias-state-warn-label: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    background: var(--dsw-alias-bg-layer-2);
+    color: var(--dsw-alias-label-primary);
+    font-size: 14px;
+  }
+  #app { display: flex; height: 100vh; }
+  #sidebar {
+    width: 264px;
+    flex: none;
+    background: var(--dsw-alias-bg-layer-1);
+    border-right: 1px solid var(--dsw-alias-border-l1);
+    padding: 12px 8px;
+    overflow-y: auto;
+  }
+  .navsection {
+    font-size: 11px;
+    color: var(--dsw-alias-label-tertiary);
+    letter-spacing: 0.05em;
+    padding: 8px 10px 4px;
+  }
+  nav.panellist { display: flex; flex-direction: column; gap: 2px; }
+  .navrow { display: block; }
+  .navrow-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--dsw-alias-label-secondary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .navrow-btn:hover { background: var(--dsw-alias-interactive-bg-hover); }
+  .navrow-btn .iconcell {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  #slot-panellist { display: inline-flex; }
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  #main-titlebar {
+    height: 48px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    background: var(--dsw-alias-bg-layer-1);
+    border-bottom: 1px solid var(--dsw-alias-border-l1);
+    font-weight: 600;
+  }
+  #main-body { flex: 1; padding: 24px; color: var(--dsw-alias-label-secondary); }
+  .placeholder {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 28px;
+    border: 1px dashed var(--dsw-alias-border-l1);
+    border-radius: 12px;
+    background: var(--dsw-alias-bg-layer-1);
+    line-height: 1.7;
+  }
+  .placeholder strong { color: var(--dsw-alias-label-primary); }
+  #slot-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
+  #slot-overlay > * { pointer-events: auto; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="navsection">导航</div>
+      <nav class="panellist" aria-label="侧栏导航">
+        <div class="navrow">
+          <button type="button" class="navrow-btn">
+            <span class="iconcell" id="slot-panellist"></span>
+            <span>会话状态看板</span>
+          </button>
+        </div>
+        <div class="navrow">
+          <button type="button" class="navrow-btn">
+            <span class="iconcell">🗂</span>
+            <span>工作区 · personal</span>
+          </button>
+        </div>
+        <div class="navrow">
+          <button type="button" class="navrow-btn">
+            <span class="iconcell">🗂</span>
+            <span>工作区 · infra</span>
+          </button>
+        </div>
+      </nav>
+    </aside>
+    <main id="main">
+      <div id="main-titlebar">DeepSeek Harness</div>
+      <div id="main-body">
+        <div class="placeholder">
+          <strong>演示宿主页。</strong>
+          这里加载 <code>lib/client.js</code> 的真实构建产物并注入五条演示会话，
+          用于产出 README 的界面截图：侧栏树四个状态目录、悬浮环形分段按钮、
+          浮窗看板与决策题卡。URL 加 <code>#theme=dark</code> 切换深色令牌。
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="slot-overlay"></div>
+</body>
+</html>

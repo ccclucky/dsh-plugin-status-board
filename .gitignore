@@ -43,3 +43,6 @@ scratch/
 .preview*
 # Prototype scratch: interactive HTML used to agree on feel before implementing.
 .scratch/
+
+# Demo harness build output (rebuild with the esbuild command in docs/demo/README.md)
+docs/demo/harness/page.js

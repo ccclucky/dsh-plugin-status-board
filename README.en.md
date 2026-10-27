@@ -36,11 +36,11 @@ The three classifier boards are **exclusive**: one session lands on exactly one 
   <img src="https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-board.png" alt="Sidebar tree and floating board" width="820">
 </p>
 
-| Sidebar tree + floating entry | Decision card (demo data) |
+| Sidebar tree + donut entry | Decision card (demo data) |
 | :---: | :---: |
 | ![Sidebar tree](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-tree.png) | ![Decision card](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-card.png) |
 
-| Dark theme | Expand / open / collapse |
+| Dark theme | Tally card / expand / open / collapse |
 | :---: | :---: |
 | ![Dark theme](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/dark-board.png) | ![Interaction](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/demo-collapse.gif) |
 

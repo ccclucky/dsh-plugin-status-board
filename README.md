@@ -36,11 +36,11 @@
   <img src="https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-board.png" alt="侧栏目录树与浮窗看板" width="820">
 </p>
 
-| 目录树 + 悬浮按钮 | 浮窗决策题卡（演示数据） |
+| 目录树 + 环形分段按钮 | 浮窗决策题卡（演示数据） |
 | :---: | :---: |
 | ![侧栏目录树](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-tree.png) | ![决策题卡](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/light-card.png) |
 
-| 深色主题 | 展开 / 打开 / 收起 |
+| 深色主题 | 明细卡 / 展开 / 打开 / 收起 |
 | :---: | :---: |
 | ![深色主题](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/dark-board.png) | ![交互](https://raw.githubusercontent.com/ccclucky/dsh-plugin-status-board/main/docs/demo/demo-collapse.gif) |
 
