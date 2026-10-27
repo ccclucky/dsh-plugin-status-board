@@ -143,7 +143,7 @@ describe('BoardOverlay (entry ②)', () => {
     expect(container.querySelector('.status-board__fab-tooltip')).not.toBeNull()
 
     // The tooltip lists the four statuses with folder markers
-    const marks = container.querySelectorAll('.status-board__fab .status-board-status')
+    const marks = container.querySelectorAll('.status-board__fab-tooltip .status-board-status')
     expect(marks).toHaveLength(4)
     expect([...marks].map(m => m.getAttribute('data-bucket'))).toEqual(['decision', 'executing', 'unread', 'recent'])
     expect([...marks].every(m => m.getAttribute('data-variant') === 'folder')).toBe(true)

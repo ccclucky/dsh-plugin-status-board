@@ -767,76 +767,78 @@ export function BoardOverlay({
         <span className="status-board__fab-center" aria-hidden="true">
           {centerText}
         </span>
+      </button>
 
-        {/* Hover Tooltip breakdown: dynamically positioned and edge-clamped */}
-        {showTooltip ? (
-          <div
-            ref={tooltipRef}
-            className="status-board__fab-tooltip"
-            style={
-              tooltipPlacement === undefined
-                ? { position: 'fixed', opacity: 0, visibility: 'hidden', pointerEvents: 'none' }
-                : {
-                    position: 'fixed',
-                    left: `${tooltipPlacement.left}px`,
-                    top: `${tooltipPlacement.top}px`,
-                    right: 'auto',
-                    bottom: 'auto',
-                    opacity: tooltipVisible ? 1 : 0,
-                    visibility: tooltipVisible ? 'visible' : 'hidden',
-                    pointerEvents: tooltipVisible ? 'auto' : 'none',
-                  }
-            }
-            data-placement={tooltipPlacement?.opensUp === true ? 'top' : 'bottom'}
-            data-visible={tooltipVisible ? 'true' : 'false'}
-            role="tooltip"
-            aria-hidden={!tooltipVisible}
-          >
-            <div className="status-board__fab-tooltip-head">
-              <span>{translate('panel.shortTitle')}</span>
-              <span>{translate('summary.total', { total })}</span>
+      {/* Hover Tooltip: rendered as sibling to avoid containing-block distortion from button transforms */}
+      {showTooltip ? (
+        <div
+          ref={tooltipRef}
+          className="status-board__fab-tooltip"
+          style={
+            tooltipPlacement === undefined
+              ? { position: 'fixed', opacity: 0, visibility: 'hidden', pointerEvents: 'none' }
+              : {
+                  position: 'fixed',
+                  left: `${tooltipPlacement.left}px`,
+                  top: `${tooltipPlacement.top}px`,
+                  right: 'auto',
+                  bottom: 'auto',
+                  opacity: tooltipVisible ? 1 : 0,
+                  visibility: tooltipVisible ? 'visible' : 'hidden',
+                  pointerEvents: tooltipVisible ? 'auto' : 'none',
+                }
+          }
+          data-placement={tooltipPlacement?.opensUp === true ? 'top' : 'bottom'}
+          data-visible={tooltipVisible ? 'true' : 'false'}
+          role="tooltip"
+          aria-hidden={!tooltipVisible}
+          onPointerEnter={() => setHovered(true)}
+          onPointerLeave={() => setHovered(false)}
+        >
+          <div className="status-board__fab-tooltip-head">
+            <span>{translate('panel.shortTitle')}</span>
+            <span>{translate('summary.total', { total })}</span>
+          </div>
+          <div className="status-board__fab-tooltip-list">
+            <div className="status-board__fab-row" data-bucket="decision">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="decision" variant="folder" empty={counts.decision === 0} />
+                <span>{translate('bucket.decision')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={counts.decision === 0}>
+                {counts.decision}
+              </span>
             </div>
-            <div className="status-board__fab-tooltip-list">
-              <div className="status-board__fab-row" data-bucket="decision">
-                <span className="status-board__fab-group">
-                  <StatusMark bucket="decision" variant="folder" empty={counts.decision === 0} />
-                  <span>{translate('bucket.decision')}</span>
-                </span>
-                <span className="status-board__fab-count" data-empty={counts.decision === 0}>
-                  {counts.decision}
-                </span>
-              </div>
-              <div className="status-board__fab-row" data-bucket="executing">
-                <span className="status-board__fab-group">
-                  <StatusMark bucket="executing" variant="folder" empty={counts.executing === 0} />
-                  <span>{translate('bucket.executing')}</span>
-                </span>
-                <span className="status-board__fab-count" data-empty={counts.executing === 0}>
-                  {counts.executing}
-                </span>
-              </div>
-              <div className="status-board__fab-row" data-bucket="unread">
-                <span className="status-board__fab-group">
-                  <StatusMark bucket="unread" variant="folder" empty={unreadCount === 0} />
-                  <span>{translate('bucket.unread')}</span>
-                </span>
-                <span className="status-board__fab-count" data-empty={unreadCount === 0}>
-                  {unreadCount}
-                </span>
-              </div>
-              <div className="status-board__fab-row" data-bucket="recent">
-                <span className="status-board__fab-group">
-                  <StatusMark bucket="recent" variant="folder" empty={recentCount === 0} />
-                  <span>{translate('bucket.recent')}</span>
-                </span>
-                <span className="status-board__fab-count" data-empty={recentCount === 0}>
-                  {recentCount}
-                </span>
-              </div>
+            <div className="status-board__fab-row" data-bucket="executing">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="executing" variant="folder" empty={counts.executing === 0} />
+                <span>{translate('bucket.executing')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={counts.executing === 0}>
+                {counts.executing}
+              </span>
+            </div>
+            <div className="status-board__fab-row" data-bucket="unread">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="unread" variant="folder" empty={unreadCount === 0} />
+                <span>{translate('bucket.unread')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={unreadCount === 0}>
+                {unreadCount}
+              </span>
+            </div>
+            <div className="status-board__fab-row" data-bucket="recent">
+              <span className="status-board__fab-group">
+                <StatusMark bucket="recent" variant="folder" empty={recentCount === 0} />
+                <span>{translate('bucket.recent')}</span>
+              </span>
+              <span className="status-board__fab-count" data-empty={recentCount === 0}>
+                {recentCount}
+              </span>
             </div>
           </div>
-        ) : null}
-      </button>
+        </div>
+      ) : null}
       {open ? (
         <div
           className="status-board__overlay status-board__overlay--fab"
