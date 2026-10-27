@@ -214,6 +214,23 @@ export const PANEL_CSS = String.raw`
   font-variant-numeric: tabular-nums;
 }
 
+/* How many of the listed rows are finished-but-unopened. Not a filled chip on
+   purpose: this count is secondary to the board's own total, so it reads as a suffix
+   and must not compete with the decision tally, which is the number to act on. */
+.status-board__count-unopened {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.status-board__count-unopened::before {
+  content: "\00b7";
+  margin-right: 4px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .status-board__card[data-bucket="decision"][data-count-empty="false"] .status-board__count {
   color: var(--dsw-alias-state-warn-primary);
 }
@@ -555,6 +572,39 @@ button.status-board__row:active {
   background: transparent;
 }
 
+/* Completion reminder: a run finished and the session has not been opened since.
+
+   Drawn as a dot on the marker's corner rather than as a second element in the row,
+   because the two facts are independent - a row can be waiting on the user and also
+   carry an unread completion. The ring lifts it off whatever it overlaps, so it stays
+   legible on the amber decision ring as well as on the plain recent one. */
+.status-board-status[data-unopened="true"]::after {
+  content: "";
+  position: absolute;
+  /* Sits outside the ring rather than on it: at -2px the dot covered a quarter of the
+     status ring, so the row read as a ring with a bite taken out. -4px keeps the two
+     shapes separate at both marker sizes. */
+  /* Tucked onto the ring's upper-right shoulder. Further out and the dot reads as a
+     separate glyph competing with the mark; further in and it bites the ring. */
+  top: -2px;
+  right: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
+  /* One thin surface ring, so the dot separates from the mark underneath without its
+     halo growing larger than the mark itself. */
+  box-shadow: 0 0 0 1.5px var(--dsw-alias-bg-layer-1);
+  grid-area: auto;
+  animation: none;
+}
+
+/* The folder marker is 16px, so the same visual gap needs a smaller offset. */
+.status-board-status[data-variant="folder"][data-unopened="true"]::after {
+  top: -1px;
+  right: -1px;
+}
+
 @keyframes status-board-status-breathe-soft {
   0%,
   100% {
@@ -679,6 +729,21 @@ button.status-board__row:active {
   font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+/* Same meaning as the panel's suffix, sized for the sidebar's smaller type. */
+.status-board-tree__count-unopened {
+  margin-left: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.status-board-tree__count-unopened::before {
+  content: "\00b7";
+  margin-right: 3px;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .status-board-tree__folder[data-bucket="decision"][data-count-empty="false"] .status-board-tree__count {

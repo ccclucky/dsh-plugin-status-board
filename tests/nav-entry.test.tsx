@@ -197,6 +197,54 @@ describe('BoardNavEntry (entry ①)', () => {
 })
 
 describe('describeCounts', () => {
+  it('marks a finished, unopened session and reports it in the folder header', () => {
+    const store = makeStore([signal('r', {})])
+    const container = document.createElement('div')
+    document.body.append(container)
+    const nav = document.createElement('nav')
+    nav.setAttribute('aria-label', 'panels')
+    const rowButton = document.createElement('button')
+    rowButton.type = 'button'
+    nav.append(rowButton)
+    container.append(nav)
+
+    const root = createRoot(rowButton)
+    const statusMap = new Map([['r', { completionUnread: true }]])
+    act(() => {
+      root.render(
+        createElement(BoardNavEntry, {
+          tree: createOverlayController(),
+          store,
+          size: 16,
+          resolveNavigation: () => undefined,
+          // The shell injects this as a slot-standard prop, not through ctx.
+          useSessionStatus: () => statusMap,
+        }),
+      )
+    })
+    mounted.push({ root, container })
+
+    // Open the tree so the rows exist in the portal.
+    act(() => {
+      rowButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // The dot lives on the shared marker (one mark per row, not a second element).
+    expect(container.querySelector('.status-board-status[data-unopened="true"]')).not.toBeNull()
+    // The folder header keeps the count visible even when the folder is collapsed.
+    expect(container.querySelector('.status-board-tree__count-unopened')?.textContent).toContain('1')
+  })
+
+  it('renders the tree without the hook, so a bare shell still works', () => {
+    const store = makeStore([signal('r', {})])
+    const { container, row } = mountInNav(store)
+    act(() => {
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(container.querySelector('.status-board-tree__folder')).not.toBeNull()
+    expect(container.querySelector('.status-board-status[data-unopened="true"]')).toBeNull()
+  })
+
   it('reports the three counts in board order', () => {
     const translate = createTranslate('en')
     expect(describeCounts(translate, { decision: 1, executing: 2, recent: 3 })).toContain('Needs my decision 1')

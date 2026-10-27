@@ -46,6 +46,11 @@ import {
   type FabPositionStorage,
 } from './fab-geometry.ts'
 import { DRAG_THRESHOLD, KEYBOARD_STEP, useFabDrag } from './fab-drag.ts'
+import {
+  UnreadStatusContext,
+  useSessionStatusMap,
+  type UseSessionStatus,
+} from './completion-unread.ts'
 
 /**
  * Open/closed state for one disclosure surface.
@@ -136,14 +141,26 @@ export function BoardNavEntry({
   store,
   size,
   resolveNavigation,
+  useSessionStatus,
 }: {
   readonly tree: OverlayController
   readonly store: BoardStore
   readonly size: number
   readonly resolveNavigation: () => ((sessionId: string) => void) | undefined
+  /**
+   * The platform's `useSessionStatus` slot hook, when this shell provides it.
+   *
+   * It arrives as a slot prop rather than a service, so it is threaded in from the
+   * registration rather than obtained from `ctx`. Optional: an older shell or a test
+   * renderer simply has no completion reminders.
+   */
+  readonly useSessionStatus?: UseSessionStatus | undefined
 }): ReactElement {
   const open = useSyncExternalStore(tree.subscribe, tree.getSnapshot, tree.getSnapshot)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  // Called unconditionally, even when the shell supplies no hook: a conditional hook
+  // would change the call order between renders.
+  const statusMap = useSessionStatusMap(useSessionStatus)
   const translate = createTranslate(state.locale)
   const iconRef = useRef<HTMLSpanElement | null>(null)
   const warned = useRef(false)
@@ -279,14 +296,26 @@ export function BoardNavEntry({
           </span>
         )}
       </span>
-      {container !== null && !collapsed ? createPortal(<StatusTree store={store} onOpenSession={onOpenSession} />, container) : null}
+      {/* The tree lives in the sidebar's nav via a portal, and the inline tree is
+          rendered as a child of the row only when no portal container exists. Both
+          paths get the status map so their rows can show the completion reminder. */}
+      {container !== null && !collapsed
+        ? createPortal(
+            <UnreadStatusContext.Provider value={statusMap}>
+              <StatusTree store={store} onOpenSession={onOpenSession} />
+            </UnreadStatusContext.Provider>,
+            container,
+          )
+        : null}
       {fallback !== null && open && !collapsed
         ? createPortal(
             <div
               className="status-board__tree-fallback"
               style={{ position: 'fixed', left: fallback.left, top: fallback.top, width: fallback.width }}
             >
-              <StatusTree store={store} onOpenSession={onOpenSession} />
+              <UnreadStatusContext.Provider value={statusMap}>
+                <StatusTree store={store} onOpenSession={onOpenSession} />
+              </UnreadStatusContext.Provider>
             </div>,
             document.body,
           )
@@ -321,6 +350,7 @@ export function BoardOverlay({
   resolveNavigation,
   answerQuestion,
   positionStorage,
+  useSessionStatus,
 }: {
   readonly controller: OverlayController
   readonly store: BoardStore
@@ -328,9 +358,12 @@ export function BoardOverlay({
   readonly answerQuestion?: AnswerQuestion | undefined
   /** Where the remembered position lives; `undefined` keeps it in memory only. */
   readonly positionStorage?: FabPositionStorage | undefined
+  /** The platform's `useSessionStatus` slot hook, when the shell provides it. */
+  readonly useSessionStatus?: UseSessionStatus | undefined
 }): ReactElement | null {
   const open = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const statusMap = useSessionStatusMap(useSessionStatus)
   const translate = createTranslate(state.locale)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const fabRef = useRef<HTMLButtonElement | null>(null)
@@ -538,7 +571,7 @@ export function BoardOverlay({
       : { left: `${clamped.left}px`, top: `${clamped.top}px`, right: 'auto', bottom: 'auto' }
 
   return (
-    <>
+    <UnreadStatusContext.Provider value={statusMap}>
       <style>{PANEL_CSS}</style>
       <button
         ref={fabRef}
@@ -633,6 +666,6 @@ export function BoardOverlay({
           </div>
         </div>
       ) : null}
-    </>
+    </UnreadStatusContext.Provider>
   )
 }

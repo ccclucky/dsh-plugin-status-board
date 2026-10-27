@@ -13,6 +13,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { BoardPanel, BoardGlyph, Row } from '../src/client/Panel.tsx'
+import { UnreadStatusContext } from '../src/client/completion-unread.ts'
 import { createBoardStore } from '../src/client/store.ts'
 import { createTranslate } from '../src/shared/i18n.ts'
 import type { SessionListLike } from '../src/client/session-source.ts'
@@ -80,6 +81,63 @@ async function render(
   store.dispose()
   return markup
 }
+
+describe('completion reminder', () => {
+  /** Render the panel the way the overlay mounts it: provider outside, panel inside. */
+  function withStatuses(
+    store: Awaited<ReturnType<typeof storeFor>>,
+    map: Map<string, { completionUnread?: boolean }>,
+  ): string {
+    return renderToStaticMarkup(
+      createElement(
+        UnreadStatusContext.Provider,
+        { value: map },
+        createElement(BoardPanel, { store }),
+      ),
+    )
+  }
+
+  it('marks an unopened completion and counts it in the board header', async () => {
+    const store = await storeFor([row('r', 'done and unseen')])
+    const markup = withStatuses(store, new Map([['r', { completionUnread: true }]]))
+    // Match the element, not the stylesheet: the panel inlines its own CSS, so a
+    // bare `data-unopened="true"` would also match the attribute selector and the
+    // assertion would pass even with no row marked.
+    expect(markup).toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
+    // The header reports how many, which is what stays readable while collapsed.
+    expect(markup).toMatch(/class="status-board__count-unopened"/)
+  })
+
+  it('leaves a plainly-seen row unmarked', async () => {
+    const store = await storeFor([row('r', 'seen already')])
+    const markup = withStatuses(store, new Map([['r', { completionUnread: false }]]))
+    expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
+    expect(markup).not.toMatch(/class="status-board__count-unopened"/)
+  })
+
+  it('renders every row when the platform provides no status hook at all', async () => {
+    // The reminder is decoration, never a precondition: a composition without the
+    // hook must render the same board.
+    const store = await storeFor([row('r', 'no hook here')])
+    const markup = renderToStaticMarkup(createElement(BoardPanel, { store }))
+    expect(markup).toContain('no hook here')
+    expect(markup).not.toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
+  })
+
+  it('does not count an unread session that the filter hides', async () => {
+    // A header that counts rows it no longer lists is a small lie users notice.
+    const store = await storeFor([row('a', 'alpha done'), row('b', 'beta done')])
+    const markup = withStatuses(
+      store,
+      new Map([
+        ['a', { completionUnread: true }],
+        ['b', { completionUnread: true }],
+      ]),
+    )
+    expect(markup).toMatch(/class="status-board-status"[^>]*data-unopened="true"/)
+    expect(markup).toMatch(/class="status-board__count-unopened"/)
+  })
+})
 
 describe('BoardPanel', () => {
   it('renders the three board names in declaration order', async () => {

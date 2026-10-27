@@ -23,6 +23,7 @@
     "recentUnit": "recent",
     "decisionEmpty": "Nothing waiting on you",
     "executingEmpty": "Nothing running",
+    "unopened": "unopened",
     "recentEmpty": "No recent activity",
     "recentHintDays": "Active in the last {days} days"
   },
@@ -64,7 +65,8 @@
   },
   "tree": {
     "label": "Session status folders",
-    "session": "Open session “{name}”"
+    "session": "Open session “{name}”",
+    "unopened": "Finished, not opened yet"
   },
   "question": {
     "label": "Needs your answer",

@@ -30,6 +30,8 @@ export interface LocaleFile {
     readonly label: string
     /** Accessible name of one session row in the tree. */
     readonly session: string
+      /** Announced for a row that finished running and has not been opened. */
+      readonly unopened: string
   }
   readonly bucket: {
     readonly decision: string
@@ -51,6 +53,8 @@ export interface LocaleFile {
     readonly decisionEmpty: string
     readonly executingEmpty: string
     readonly recentEmpty: string
+      /** Suffix appended to a board's count: finished and not yet opened. */
+      readonly unopened: string
   }
   readonly question: {
     readonly label: string

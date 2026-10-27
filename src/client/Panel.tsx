@@ -32,6 +32,7 @@ import { createTranslate, formatRelativeTime, recentWindowHint, type MessageKey,
 import type { BoardState, BoardStore } from './store.ts'
 import { QuestionCard, type AnswerQuestion } from './QuestionCard.tsx'
 import { StatusMark } from './StatusMark.tsx'
+import { countCompletionUnread, isCompletionUnread, useUnreadStatuses } from './completion-unread.ts'
 import { PANEL_CSS } from './styles.ts'
 
 /** The panel's props: the store it renders plus the navigation seam. */
@@ -141,6 +142,8 @@ export function Row({
   readonly onOpen: ((sessionId: string) => void) | undefined
   readonly answerQuestion?: AnswerQuestion | undefined
 }): ReactElement {
+  const statuses = useUnreadStatuses()
+  const unopened = isCompletionUnread(statuses, entry.id)
   const meta = formatRelativeTime(now, entry.lastActivityAt, translate)
   // The workspace path would cost a third column in the compact row; the native
   // tooltip carries it instead.
@@ -151,7 +154,7 @@ export function Row({
   // never changes its hook order between two publications.
   const [expanded, setExpanded] = useState(false)
   const content = [
-    <StatusMark bucket={bucket} variant="row" key="dot" />,
+    <StatusMark bucket={bucket} variant="row" unopened={unopened} key="dot" />,
     <span className="status-board__row-title" key="title">
       {entry.title}
     </span>,
@@ -175,8 +178,9 @@ export function Row({
         data-state={bucket}
         title={tooltip}
         // The visible title is the accessible name; the relative time rides
-        // along as the description.
-        aria-label={entry.title}
+        // along as the description. A screen-reader user cannot see the corner
+        // dot, so the reminder is spelled out here.
+        aria-label={unopened ? `${entry.title}, ${translate('tree.unopened')}` : entry.title}
         aria-describedby={metaId}
         onClick={() => onOpen(entry.id)}
       >
@@ -245,6 +249,7 @@ function Bucket({
   const headingId = `status-board-heading-${instanceId}`
   const regionId = `status-board-region-${instanceId}`
 
+  const statuses = useUnreadStatuses()
   const visible = matchesFilter(board.entries, query)
   const collapsed = isCollapsed(state.collapse, id)
   const count = visible.length
@@ -254,6 +259,9 @@ function Bucket({
     : translate(`bucket.${id}Hint` as MessageKey, { hours: state.board.windowHours })
   const empty = translate(`bucket.${id}Empty` as MessageKey)
   const filtering = query.trim().length > 0
+  // Counted over the rows this board actually lists, so a search that hides a row
+  // cannot leave the header claiming unread work that is no longer on screen.
+  const unopenedCount = countCompletionUnread(statuses, visible)
 
   // While filtering, a board with no match is noise: the user asked a question
   // and this board has nothing to say about it.
@@ -284,6 +292,11 @@ function Bucket({
           <span className="status-board__count" aria-hidden="true">
             {count}
           </span>
+          {unopenedCount > 0 ? (
+            <span className="status-board__count-unopened" aria-hidden="true">
+              {translate('bucket.unopened')} {unopenedCount}
+            </span>
+          ) : null}
         </button>
       </h2>
       {/* Mounted even while collapsed so `aria-controls` always resolves to a

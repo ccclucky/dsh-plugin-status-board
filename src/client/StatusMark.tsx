@@ -28,17 +28,25 @@ export type StatusMarkVariant = 'folder' | 'row'
 /**
  * One decorative status marker.
  *
- * @param props - the board it represents and its visual weight.
+ * `unopened` adds the platform's completion reminder as a corner dot rather than
+ * changing the marker's own shape: the two facts are independent (a session can be
+ * waiting on the user *and* have finished a run they have not looked at), so
+ * replacing one with the other would lose information.
+ *
+ * @param props - the board it represents, its visual weight, and the reminder flag.
  */
 export function StatusMark({
   bucket,
   variant,
   empty = false,
+  unopened = false,
 }: {
   readonly bucket: BucketId
   readonly variant: StatusMarkVariant
   /** A directory with no sessions stays still and dimmed; the state is not live. */
   readonly empty?: boolean | undefined
+  /** Finished running and not opened since. Session rows only. */
+  readonly unopened?: boolean | undefined
 }): ReactElement {
   return (
     <span
@@ -46,6 +54,7 @@ export function StatusMark({
       data-bucket={bucket}
       data-variant={variant}
       data-empty={empty}
+      data-unopened={unopened}
       aria-hidden="true"
     />
   )

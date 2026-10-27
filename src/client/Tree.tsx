@@ -23,6 +23,7 @@ import { createTranslate, formatRelativeTime, recentWindowHint, type Translate }
 import type { BoardStore } from './store.ts'
 import { Chevron, useRelativeClock } from './Panel.tsx'
 import { StatusMark } from './StatusMark.tsx'
+import { countCompletionUnread, isCompletionUnread, useUnreadStatuses } from './completion-unread.ts'
 import { PANEL_CSS } from './styles.ts'
 
 /** The tree's props: the store it renders and the navigation seam. */
@@ -49,10 +50,12 @@ function TreeRow({
   readonly now: number
   readonly onOpenSession: ((sessionId: string) => void) | undefined
 }): ReactElement {
+  const statuses = useUnreadStatuses()
+  const unopened = isCompletionUnread(statuses, entry.id)
   const time = formatRelativeTime(now, entry.lastActivityAt, translate)
   const tooltip = entry.workspacePath === undefined ? entry.title : `${entry.title}\n${entry.workspacePath}`
   const content = [
-    <StatusMark bucket={bucket} variant="row" key="dot" />,
+    <StatusMark bucket={bucket} variant="row" unopened={unopened} key="dot" />,
     <span className="status-board-tree__title" key="title">
       {entry.title}
     </span>,
@@ -75,7 +78,13 @@ function TreeRow({
         type="button"
         className="status-board-tree__row"
         title={tooltip}
-        aria-label={translate('tree.session', { name: entry.title })}
+        aria-label={
+          // A screen-reader user cannot see the corner dot, so the row says
+          // it in words instead of relying on colour.
+          unopened
+            ? `${translate('tree.session', { name: entry.title })}, ${translate('tree.unopened')}`
+            : translate('tree.session', { name: entry.title })
+        }
         onClick={() => onOpenSession(entry.id)}
       >
         {content}
@@ -99,6 +108,7 @@ function TreeFolder({
   readonly onOpenSession: ((sessionId: string) => void) | undefined
 }): ReactElement | null {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const statuses = useUnreadStatuses()
   const board = state.board.buckets.find(candidate => candidate.id === id)
   if (board === undefined) return null
   const collapsed = isCollapsed(state.collapse, id)
@@ -108,6 +118,9 @@ function TreeFolder({
     : translate(`bucket.${id}Hint`, { hours: state.board.windowHours })
   const empty = translate(`bucket.${id}Empty`)
   const count = board.entries.length
+  // Counted from the rows this folder lists, not from the whole status map:
+  // the map also holds sessions this board does not render.
+  const unopenedCount = countCompletionUnread(statuses, board.entries)
   const regionId = `status-board-tree-region-${id}`
   const loading = state.status === 'loading' && count === 0
 
@@ -129,6 +142,13 @@ function TreeFolder({
           <span className="status-board-tree__count" aria-hidden="true">
             {count}
           </span>
+          {unopenedCount > 0 ? (
+            /* Visible while the folder is collapsed, which is the point: it says
+               there is unfinished work inside without opening it. */
+            <span className="status-board-tree__count-unopened" aria-hidden="true">
+              {translate('bucket.unopened')} {unopenedCount}
+            </span>
+          ) : null}
         </button>
       </h3>
       {/* Mounted while collapsed so aria-controls always resolves. */}
