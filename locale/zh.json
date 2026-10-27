@@ -23,6 +23,7 @@
     "recentUnit": "条近期记录",
     "decisionEmpty": "没有等你拍板的事",
     "executingEmpty": "没有正在执行的会话",
+    "unopened": "未看",
     "recentEmpty": "近期没有动静",
     "recentHintDays": "最近 {days} 天内有动静"
   },
@@ -64,7 +65,8 @@
   },
   "tree": {
     "label": "会话状态目录",
-    "session": "打开会话「{name}」"
+    "session": "打开会话「{name}」",
+    "unopened": "已完成，尚未查看"
   },
   "question": {
     "label": "待你回答",

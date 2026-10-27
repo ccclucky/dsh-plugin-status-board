@@ -62,9 +62,40 @@ const table = {
   require(specifier) {
     requested.push(specifier)
     if (specifier === 'react') {
+      // Mirrors the members the browser table really provides, so a valid bundle is
+      // not rejected merely for using an API the plugin has not reached for before.
+      // `verify-build` exists to prove the bundle resolves React through the loader
+      // rather than bundling it - not to pin the exact React surface.
       return {
-        createElement: () => ({}),
-        useSyncExternalStore: () => ({}),
+        createElement: (...args) => ({ type: args[0], props: args[1] ?? {} }),
+        cloneElement: element => element,
+        createContext: defaultValue => ({ Provider: 'Provider', Consumer: 'Consumer', _currentValue: defaultValue }),
+        useContext: context => context?._currentValue,
+        createRef: () => ({ current: null }),
+        forwardRef: render => render,
+        memo: component => component,
+        useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}],
+        useReducer: (reducer, initial) => [initial, () => {}],
+        useEffect: () => {},
+        useLayoutEffect: () => {},
+        useMemo: factory => factory(),
+        useCallback: fn => fn,
+        useRef: initial => ({ current: initial }),
+        useId: () => 'r0',
+        useSyncExternalStore: (_subscribe, getSnapshot) => {
+          try {
+            return getSnapshot()
+          } catch {
+            return undefined
+          }
+        },
+        useTransition: () => [false, fn => fn()],
+        useDeferredValue: value => value,
+        startTransition: fn => fn(),
+        Fragment: 'Fragment',
+        StrictMode: 'StrictMode',
+        Children: { toArray: children => (Array.isArray(children) ? children : [children]) },
+        isValidElement: value => typeof value === 'object' && value !== null && 'type' in value,
       }
     }
     if (specifier === 'react/jsx-runtime') {

@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A completion reminder on session rows.** A session that finished a run, is not the one
+  on screen, and has not been opened since now carries a small green dot on its status
+  marker, and each board's header reports how many such rows it holds (`12 · 2 未看`). The
+  state is the platform's own `completionUnread`, read through the `useSessionStatus`
+  standard slot prop, so the board cannot disagree with the sidebar about what "unread"
+  means and nothing is stored locally.
+  It is a marker rather than a fourth board on purpose: the flag is a process-local
+  observation (a first scan does not set it, and a reload clears it), while the three
+  boards are claims that survive a reload. See `docs/adr/0002`.
+- `GLOSSARY.md` gains **完成未读** and a sharpened **近期记录**, so neither can drift into
+  meaning "unread messages" in a later change.
+
+### Fixed
+
+- The build verifier's React stand-in provided only `createElement` and
+  `useSyncExternalStore`, so the first client change that used `createContext` failed the
+  build with "client factory threw" although the bundle was correct. The stand-in now
+  mirrors the members the browser module table actually provides.
+- The reminder dot first sat on top of the status ring, so the row read as a ring with a
+  bite taken out. Caught by looking at a 4× capture, where the two variants differ even
+  though they are identical at 1×; the dot now sits on the ring's shoulder.
+
 ## [0.4.0] — 2026-10-27
 
 ### Added

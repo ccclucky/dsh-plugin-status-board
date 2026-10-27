@@ -33,6 +33,7 @@
 import { createElement, type ReactElement } from 'react'
 import { LOCALE_NAMESPACE, createTranslate } from '../shared/i18n.ts'
 import { createOverlayController, BoardNavEntry, BoardOverlay } from './overlay.tsx'
+import type { UseSessionStatus } from './completion-unread.ts'
 import type { AnswerQuestion } from './QuestionCard.tsx'
 import type { AnswerBatch } from '../shared/types.ts'
 import { createBoardStore, loadPublishedConfig, type BoardStore, type CollapseStorage } from './store.ts'
@@ -184,8 +185,18 @@ export function apply(ctx: ClientContext): void {
   const treeController = createOverlayController()
   const boardController = createOverlayController()
 
-  const NavEntry = ({ size }: { size: number }): ReactElement =>
-    createElement(BoardNavEntry, { tree: treeController, store, size, resolveNavigation })
+  // `useSessionStatus` is a slot-standard prop the shell injects into this
+  // component; it is not reachable through `ctx`, so it must be forwarded.
+  type SlotStandardProps = { readonly useSessionStatus?: UseSessionStatus }
+
+  const NavEntry = ({ size, useSessionStatus }: SlotStandardProps & { size: number }): ReactElement =>
+    createElement(BoardNavEntry, {
+      tree: treeController,
+      store,
+      size,
+      resolveNavigation,
+      ...(useSessionStatus === undefined ? {} : { useSessionStatus }),
+    })
 
   // The counts are drawn inside the tree and as the floating button's badge;
   // the framework's nav label stays plain text.
@@ -229,12 +240,13 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
-  const Overlay = (): ReactElement | null =>
+  const Overlay = ({ useSessionStatus }: SlotStandardProps): ReactElement | null =>
     createElement(BoardOverlay, {
       controller: boardController,
       store,
       resolveNavigation,
       answerQuestion: resolveAnswer(),
+      ...(useSessionStatus === undefined ? {} : { useSessionStatus }),
       // The entry's position is a device preference, so it persists beside the
       // collapse state rather than in the plugin config (see docs/adr/0001).
       ...(storage !== undefined ? { positionStorage: storage } : {}),
