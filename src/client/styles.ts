@@ -1196,46 +1196,41 @@ button.status-board-tree__row:hover {
   height: 44px;
   min-width: 44px;
   padding: 0;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0;
   border-radius: 50%;
-  background: var(--dsw-alias-bg-layer-1);
+  background: transparent;
   color: var(--dsw-alias-label-primary);
-  box-shadow:
-    0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent),
-    0 8px 24px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
+  box-shadow: none;
   cursor: grab;
   pointer-events: auto;
+  appearance: none;
+  -webkit-appearance: none;
   /* The button owns the gesture: without this a touch drag scrolls the
      conversation behind it instead of moving the entry. */
   touch-action: none;
   user-select: none;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .status-board__fab:hover {
-  background: var(--dsw-alias-bg-layer-2);
-  transform: scale(1.06);
-  box-shadow:
-    0 4px 10px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
-    0 12px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+  transform: scale(1.08);
 }
 
 .status-board__fab:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 /* Dragging: the pointer stays over the button for the whole gesture, so a hover
    repaint would flicker; the lifted shadow is what makes the move read as real. */
 .status-board__fab--dragging {
   cursor: grabbing;
-  transform: scale(1.08);
-  border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--dsw-alias-label-primary) 22%, transparent);
+  transform: scale(1.12);
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--dsw-alias-state-business-primary) 30%, transparent));
 }
 
 .status-board__fab--dragging:hover {
-  background: var(--dsw-alias-bg-layer-1);
+  transform: scale(1.12);
 }
 
 /* ── Donut Ring SVG ──────────────────────────────────────────────────────── */
@@ -1250,16 +1245,15 @@ button.status-board-tree__row:hover {
   pointer-events: none;
 }
 
-.status-board__fab-track {
-  fill: none;
-  stroke: color-mix(in srgb, var(--dsw-alias-border-l2) 70%, transparent);
-  stroke-width: 3.5;
+.status-board__fab-backdrop {
+  fill: var(--dsw-alias-bg-layer-1);
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent));
 }
 
-.status-board__fab-inner-ring {
+.status-board__fab-track {
   fill: none;
-  stroke: color-mix(in srgb, var(--dsw-alias-border-l1) 80%, transparent);
-  stroke-width: 1;
+  stroke: color-mix(in srgb, var(--dsw-alias-border-l2) 75%, transparent);
+  stroke-width: 3.5;
 }
 
 .status-board__fab-seg {

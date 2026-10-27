@@ -717,8 +717,8 @@ export function BoardOverlay({
         }}
       >
         <svg className="status-board__fab-svg" viewBox="0 0 44 44" aria-hidden="true">
+          <circle className="status-board__fab-backdrop" cx="22" cy="22" r="14" />
           <circle className="status-board__fab-track" cx="22" cy="22" r="17" />
-          <circle className="status-board__fab-inner-ring" cx="22" cy="22" r="14.5" />
           <circle
             className="status-board__fab-seg status-board__fab-seg--decision"
             cx="22"
